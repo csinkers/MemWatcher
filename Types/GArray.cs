@@ -1,7 +1,7 @@
 ﻿using System.Text;
 using ImGuiNET;
 
-namespace MemWatcher;
+namespace MemWatcher.Types;
 
 public class GArray : IGhidraType
 {

@@ -1,6 +1,6 @@
 ﻿using ImGuiNET;
 
-namespace MemWatcher;
+namespace MemWatcher.Types;
 
 public class GPrimitive : IGhidraType
 {

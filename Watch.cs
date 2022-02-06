@@ -1,4 +1,5 @@
 ﻿using ImGuiNET;
+using MemWatcher.Types;
 
 namespace MemWatcher;
 

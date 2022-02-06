@@ -1,4 +1,4 @@
-﻿namespace MemWatcher;
+﻿namespace MemWatcher.Types;
 
 public class GStructMember
 {

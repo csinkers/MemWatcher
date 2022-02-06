@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Xml;
+using MemWatcher.Types;
 
 namespace MemWatcher;
 
@@ -152,6 +153,14 @@ public class ProgramData
         }
 
         var symbols = new Dictionary<uint, string>();
+
+        foreach (XmlNode fun in doc.SelectNodes("/PROGRAM/FUNCTIONS/FUNCTION")!)
+        {
+            var addr = HexAttrib(fun, "ENTRY_POINT");
+            var name = StrAttrib(fun, "NAME");
+            symbols[addr] = name;
+        }
+
         foreach (XmlNode sym in doc.SelectNodes("/PROGRAM/SYMBOL_TABLE/SYMBOL")!)
         {
             var addr = HexAttrib(sym, "ADDRESS");
@@ -160,7 +169,8 @@ public class ProgramData
             if (dataBlocks.TryGetValue(addr, out var data))
                 Data[(ns, name)] = data;
 
-            symbols[addr] = name;
+            if (!name.StartsWith("case"))
+                symbols[addr] = name;
         }
 
         foreach (var key in Types.Keys.ToList())

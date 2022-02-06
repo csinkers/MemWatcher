@@ -11,9 +11,12 @@ public class SymbolLookup
             return "(null)";
 
         var index = FindNearest(address);
-        var delta = (int)(address - index);
+        var nearestAddress = _symbols[index].Item1;
+        var delta = (int)(address - nearestAddress);
+        var sign = delta < 0 ? '-' : '+';
+        var absDelta = Math.Abs(delta);
         var sym = _symbols[index];
-        return delta > 0 ? $"{sym.Item2}+0x{delta:X}" : sym.Item2;
+        return delta > 0 ? $"{sym.Item2}{sign}0x{absDelta:X} ({address:X})" : sym.Item2;
     }
 
     int FindNearest(uint address)
@@ -31,6 +34,9 @@ public class SymbolLookup
             if (_symbols[mid].Item1 == address)
                 return mid;
         } while (first <= last);
+
+        if (mid < address && mid != 0)
+            mid--;
         return mid;
     }
 }
