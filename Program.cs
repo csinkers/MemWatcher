@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Numerics;
+using System.Text;
 using ImGuiNET;
 using Veldrid;
 using Veldrid.StartupUtilities;
@@ -29,11 +30,13 @@ public static class Program
             imguiRenderer.WindowResized(window.Width, window.Height);
         };
 
-        var core = new WatcherCore(SymbolPath, ProcessName);
+        var config = Config.Load();
+        var core = new WatcherCore(SymbolPath, ProcessName, config);
         var sw = new Stopwatch();
         int interval = 100;
         bool onlyShowActive = false;
 
+        var filterBuf = new byte[128];
         while (window.Exists)
         {
             var input = window.PumpEvents();
@@ -48,16 +51,20 @@ public static class Program
 
             if (ImGui.Button("Reload from XML"))
             {
-                var active = core.ActiveWatches;
                 core.Dispose();
-                core = new WatcherCore(SymbolPath, ProcessName);
-                core.ActiveWatches = active;
+                core = new WatcherCore(SymbolPath, ProcessName, config);
             }
             ImGui.SameLine();
             ImGui.Checkbox("Only Show Active", ref onlyShowActive);
 
-            ImGui.DragInt("Refresh Interval (ms)", ref interval, 1.0f, 100, 5000);
+            ImGui.Columns(2);
+            ImGui.DragInt("Interval (ms)", ref interval, 1.0f, 100, 5000);
+            ImGui.NextColumn();
             ImGui.Text($"Last refresh took {sw.ElapsedMilliseconds} ms");
+            ImGui.Columns(1);
+
+            if (ImGui.InputText("Filter", filterBuf, (uint)filterBuf.Length))
+                core.Filter = Encoding.UTF8.GetString(filterBuf).TrimEnd('\0');
 
             if ((DateTime.UtcNow - core.LastUpdateTimeUtc).TotalMilliseconds > interval)
             {

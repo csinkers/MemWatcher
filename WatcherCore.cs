@@ -8,25 +8,9 @@ public sealed class WatcherCore : IDisposable
     readonly MemoryReader _reader;
     readonly ProgramData _data;
 
+    public string Filter { get; set; }
+    public Config Config { get; }
     public DateTime LastUpdateTimeUtc { get; private set; } = DateTime.MinValue;
-    public HashSet<(string, string)> ActiveWatches {
-        get
-        {
-            var result = new HashSet<(string, string)>();
-            foreach (var ns in _namespaces)
-                foreach (var watch in ns.Watches)
-                    if(watch.IsActive)
-                        result.Add((ns.Name, watch.Name));
-            return result;
-        }
-        set
-        {
-            foreach (var ns in _namespaces)
-                foreach (var watch in ns.Watches)
-                    if (value.Contains((ns.Name, watch.Name)))
-                        watch.IsActive = true;
-        }
-    }
 
     // Active set
     // Show available symbols + active symbols
@@ -36,8 +20,9 @@ public sealed class WatcherCore : IDisposable
     // Highlight changed values
     // Searching / filtering.
 
-    public WatcherCore(string xmlFilename, string processName)
+    public WatcherCore(string xmlFilename, string processName, Config config)
     {
+        Config = config ?? throw new ArgumentNullException(nameof(config));
         _data = new ProgramData(xmlFilename);
         var dict = new Dictionary<string, WatchNamespace>();
         foreach (var kvp in _data.Data)
@@ -55,25 +40,59 @@ public sealed class WatcherCore : IDisposable
         foreach (var ns in _namespaces)
             ns.Watches.Sort((x, y) => Comparer<string>.Default.Compare(x.Name, y.Name));
 
+        foreach (var name in config.Watches)
+        {
+            var index = name.IndexOf('/');
+            var nsPart = index == -1 ? "" : name[..index];
+            var watchPart = index == -1 ? name : name[(index + 1)..];
+            var ns = _namespaces.FirstOrDefault(x => x.Name == nsPart);
+            var watch = ns?.Watches.FirstOrDefault(x => x.Name == watchPart);
+            if (watch != null)
+                watch.IsActive = true;
+        }
+
         _reader = MemoryReader.Attach(processName);
+    }
+
+    bool IsShown(Watch watch, bool onlyShowActive)
+    {
+        if (!onlyShowActive && string.IsNullOrEmpty(Filter))
+            return true;
+
+        if (onlyShowActive && watch.IsActive)
+            return true;
+
+        if (!string.IsNullOrEmpty(Filter) && watch.Name.Contains(Filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
     }
 
     public void Draw(bool onlyShowActive)
     {
+        if (ImGui.Button("Save Config"))
+            SaveConfig();
+
         foreach (var ns in _namespaces)
         {
-            if (ImGui.TreeNode(ns.Name))
-            {
-                foreach (var watch in ns.Watches)
-                {
-                    if (onlyShowActive && !watch.IsActive)
-                        continue;
-                    watch.Draw(_data.SymbolLookup);
-                }
+            if (!ImGui.TreeNode(ns.Name))
+                continue;
 
-                ImGui.TreePop();
-            }
+            foreach (var watch in ns.Watches)
+                if (IsShown(watch, onlyShowActive))
+                    watch.Draw(_data.SymbolLookup);
+
+            ImGui.TreePop();
         }
+    }
+
+    void SaveConfig()
+    {
+        Config.Watches.Clear();
+        foreach (var ns in _namespaces)
+            foreach (var watch in ns.Watches.Where(watch => watch.IsActive))
+                Config.Watches.Add(ns.Name + "/" + watch.Name);
+        Config.Save();
     }
 
     public void Update()
