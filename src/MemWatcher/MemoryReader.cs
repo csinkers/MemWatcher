@@ -3,10 +3,10 @@ using System.Runtime.InteropServices;
 
 namespace MemWatcher;
 
-public sealed class MemoryReader : IDisposable
+public sealed class MemoryReader : IMemoryReader
 {
-    public Process Process { get; }
     readonly IntPtr _handle;
+    readonly Process _process;
 
     public static MemoryReader Attach(string name)
     {
@@ -28,7 +28,7 @@ public sealed class MemoryReader : IDisposable
 
     MemoryReader(Process process, IntPtr handle)
     {
-        Process = process;
+        _process = process ?? throw new ArgumentNullException(nameof(process));
         _handle = handle;
     }
 
@@ -42,7 +42,7 @@ public sealed class MemoryReader : IDisposable
 
     public uint GetModuleAddress(string name)
     {
-        foreach (ProcessModule module in Process.Modules)
+        foreach (ProcessModule module in _process.Modules)
             if (module.ModuleName == name)
                 return (uint)module.BaseAddress;
         return 0;
@@ -75,6 +75,6 @@ public sealed class MemoryReader : IDisposable
     public void Dispose()
     {
         NativeImports.CloseHandle(_handle);
-        Process.Dispose();
+        _process.Dispose();
     }
 }

@@ -3,6 +3,7 @@
 Debug/
 bin/
 obj/
+TestExe/
 
 *.filters
 *.lock

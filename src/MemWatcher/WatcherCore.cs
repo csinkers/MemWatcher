@@ -5,10 +5,10 @@ namespace MemWatcher;
 public sealed class WatcherCore : IDisposable
 {
     readonly List<WatchNamespace> _namespaces;
-    readonly MemoryReader _reader;
+    readonly IMemoryReader _reader;
     readonly ProgramData _data;
 
-    public string Filter { get; set; }
+    public string? Filter { get; set; }
     public Config Config { get; }
     public DateTime LastUpdateTimeUtc { get; private set; } = DateTime.MinValue;
 
@@ -20,10 +20,14 @@ public sealed class WatcherCore : IDisposable
     // Highlight changed values
     // Searching / filtering.
 
-    public WatcherCore(string xmlFilename, string processName, Config config)
+    public WatcherCore(string xmlFilename, IMemoryReader reader, Config config)
     {
+        _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         Config = config ?? throw new ArgumentNullException(nameof(config));
-        _data = new ProgramData(xmlFilename);
+
+        using(var xmlStream = File.OpenRead(xmlFilename))
+            _data = new ProgramData(xmlStream);
+
         var dict = new Dictionary<string, WatchNamespace>();
         foreach (var kvp in _data.Data)
         {
@@ -51,7 +55,6 @@ public sealed class WatcherCore : IDisposable
                 watch.IsActive = true;
         }
 
-        _reader = MemoryReader.Attach(processName);
     }
 
     bool IsShown(Watch watch, bool onlyShowActive)

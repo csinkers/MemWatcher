@@ -31,7 +31,7 @@ public class Watch
         Data.Type.Draw(Name, LastBuffer ?? Array.Empty<byte>(), lookup);
     }
 
-    public void Update(MemoryReader reader)
+    public void Update(IMemoryReader reader)
     {
         if (!IsActive)
         {

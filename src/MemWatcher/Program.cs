@@ -31,7 +31,8 @@ public static class Program
         };
 
         var config = Config.Load();
-        var core = new WatcherCore(SymbolPath, ProcessName, config);
+        var reader = MemoryReader.Attach(ProcessName);
+        var core = new WatcherCore(SymbolPath, reader, config);
         var sw = new Stopwatch();
         int interval = 100;
         bool onlyShowActive = false;
@@ -52,7 +53,10 @@ public static class Program
             if (ImGui.Button("Reload from XML"))
             {
                 core.Dispose();
-                core = new WatcherCore(SymbolPath, ProcessName, config);
+                reader.Dispose();
+
+                reader = MemoryReader.Attach(ProcessName);
+                core = new WatcherCore(SymbolPath, reader, config);
             }
             ImGui.SameLine();
             ImGui.Checkbox("Only Show Active", ref onlyShowActive);

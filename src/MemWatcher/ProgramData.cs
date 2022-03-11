@@ -10,10 +10,10 @@ public class ProgramData
     public Dictionary<(string, string), GData> Data { get; } = new();
     public SymbolLookup SymbolLookup { get; }
 
-    public ProgramData(string xmlFilename)
+    public ProgramData(Stream xmlStream)
     {
         var doc = new XmlDocument();
-        doc.Load(xmlFilename);
+        doc.Load(xmlStream);
 
         foreach (var primitive in GPrimitive.PrimitiveTypes)
             Types[(primitive.Namespace, primitive.Name)] = primitive;
