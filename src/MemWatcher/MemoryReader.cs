@@ -37,7 +37,7 @@ public sealed class MemoryReader : IMemoryReader
         uint bytesRead = 0;
         var buffer = new byte[size];
         NativeImports.NtReadVirtualMemory(_handle, (IntPtr)offset, buffer, size, ref bytesRead);
-        return buffer;
+        return bytesRead == 0 ? null : buffer;
     }
 
     public uint GetModuleAddress(string name)
@@ -74,7 +74,9 @@ public sealed class MemoryReader : IMemoryReader
 
     public void Dispose()
     {
-        NativeImports.CloseHandle(_handle);
+        try { NativeImports.CloseHandle(_handle); }
+        catch (SEHException) { /* Meh */ }
+
         _process.Dispose();
     }
 }

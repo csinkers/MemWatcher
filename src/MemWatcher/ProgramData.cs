@@ -15,6 +15,7 @@ public class ProgramData
         var doc = new XmlDocument();
         doc.Load(xmlStream);
 
+        Types[(GString.Instance.Namespace, GString.Instance.Name)] = GString.Instance;
         foreach (var primitive in GPrimitive.PrimitiveTypes)
             Types[(primitive.Namespace, primitive.Name)] = primitive;
 
@@ -47,13 +48,13 @@ public class ProgramData
 
         foreach (XmlNode enumDef in doc.SelectNodes("/PROGRAM/DATATYPES/ENUM")!)
         {
-            var ns = StrAttrib(enumDef, "NAMESPACE");
-            var name = StrAttrib(enumDef, "NAME");
+            var ns = StrAttrib(enumDef, "NAMESPACE") ?? "";
+            var name = StrAttrib(enumDef, "NAME") ?? "";
             var size = UIntAttrib(enumDef, "SIZE");
 
             var elems = new Dictionary<uint, string>();
             foreach (var elem in enumDef.ChildNodes.OfType<XmlNode>().Where(x => x.Name == "ENUM_ENTRY"))
-                elems[UIntAttrib(elem, "VALUE")] = StrAttrib(elem, "NAME");
+                elems[UIntAttrib(elem, "VALUE")] = StrAttrib(elem, "NAME") ?? "";
 
             var ge = new GEnum(ns, name, size, elems);
             Types.Add((ns, name), ge);
@@ -61,25 +62,25 @@ public class ProgramData
 
         foreach (XmlNode typeDef in doc.SelectNodes("/PROGRAM/DATATYPES/TYPE_DEF")!)
         {
-            var ns = StrAttrib(typeDef, "NAMESPACE");
-            var name = StrAttrib(typeDef, "NAME");
-            var dtns = StrAttrib(typeDef, "DATATYPE_NAMESPACE");
-            var type = StrAttrib(typeDef, "DATATYPE");
+            var ns = StrAttrib(typeDef, "NAMESPACE") ?? "";
+            var name = StrAttrib(typeDef, "NAME") ?? "";
+            var dtns = StrAttrib(typeDef, "DATATYPE_NAMESPACE") ?? "";
+            var type = StrAttrib(typeDef, "DATATYPE") ?? "";
             var td = new GTypeAlias(ns, name, BuildDummyType(dtns, type));
             Types.Add((ns, name), td);
         }
 
         foreach (XmlNode funcDef in doc.SelectNodes("/PROGRAM/DATATYPES/FUNCTION_DEF")!)
         {
-            var ns = StrAttrib(funcDef, "NAMESPACE");
-            var name = StrAttrib(funcDef, "NAME");
+            var ns = StrAttrib(funcDef, "NAMESPACE") ?? "";
+            var name = StrAttrib(funcDef, "NAME") ?? "";
 
             IGhidraType returnType = GPrimitive.Void;
             var returnTypeNode = funcDef.SelectSingleNode("RETURN_TYPE");
             if (returnTypeNode != null)
             {
-                var dtns = StrAttrib(returnTypeNode, "DATATYPE_NAMESPACE");
-                var type = StrAttrib(returnTypeNode, "DATATYPE");
+                var dtns = StrAttrib(returnTypeNode, "DATATYPE_NAMESPACE") ?? "";
+                var type = StrAttrib(returnTypeNode, "DATATYPE") ?? "";
                 returnType = BuildDummyType(dtns, type);
             }
 
@@ -87,10 +88,10 @@ public class ProgramData
             foreach (var parameter in funcDef.ChildNodes.OfType<XmlNode>().Where(x => x.Name == "PARAMETER"))
             {
                 var ordinal = UIntAttrib(parameter, "ORDINAL");
-                var paramName = StrAttrib(parameter, "NAME");
+                var paramName = StrAttrib(parameter, "NAME") ?? "";
                 var size = UIntAttrib(parameter, "SIZE");
-                var dtns = StrAttrib(parameter, "DATATYPE_NAMESPACE");
-                var type = StrAttrib(parameter, "DATATYPE");
+                var dtns = StrAttrib(parameter, "DATATYPE_NAMESPACE") ?? "";
+                var type = StrAttrib(parameter, "DATATYPE") ?? "";
                 parameters.Add(new GFuncParameter(ordinal, paramName, size, BuildDummyType(dtns, type)));
             }
 
@@ -100,14 +101,14 @@ public class ProgramData
 
         foreach (XmlNode structDef in doc.SelectNodes("/PROGRAM/DATATYPES/STRUCTURE")!)
         {
-            var ns = StrAttrib(structDef, "NAMESPACE");
-            var name = StrAttrib(structDef, "NAME");
+            var ns = StrAttrib(structDef, "NAMESPACE") ?? "";
+            var name = StrAttrib(structDef, "NAME") ?? "";
             var size = UIntAttrib(structDef, "SIZE");
 
             var members = new List<GStructMember>();
             foreach (var member in structDef.ChildNodes.OfType<XmlNode>().Where(x => x.Name == "MEMBER"))
             {
-                var type = BuildDummyType(StrAttrib(member, "DATATYPE_NAMESPACE"), StrAttrib(member, "DATATYPE"));
+                var type = BuildDummyType(StrAttrib(member, "DATATYPE_NAMESPACE") ?? "", StrAttrib(member, "DATATYPE") ?? "");
                 var memberName = StrAttrib(member, "NAME");
                 var offset = UIntAttrib(member, "OFFSET");
 
@@ -121,14 +122,14 @@ public class ProgramData
 
         foreach (XmlNode unionDef in doc.SelectNodes("/PROGRAM/DATATYPES/UNION")!)
         {
-            var ns = StrAttrib(unionDef, "NAMESPACE");
-            var name = StrAttrib(unionDef, "NAME");
+            var ns = StrAttrib(unionDef, "NAMESPACE") ?? "";
+            var name = StrAttrib(unionDef, "NAME") ?? "";
             var size = UIntAttrib(unionDef, "SIZE");
 
             var members = new List<GStructMember>();
             foreach (var member in unionDef.ChildNodes.OfType<XmlNode>().Where(x => x.Name == "MEMBER"))
             {
-                var type = BuildDummyType(StrAttrib(member, "DATATYPE_NAMESPACE"), StrAttrib(member, "DATATYPE"));
+                var type = BuildDummyType(StrAttrib(member, "DATATYPE_NAMESPACE") ?? "", StrAttrib(member, "DATATYPE") ?? "");
                 var memberName = StrAttrib(member, "NAME");
                 var offset = UIntAttrib(member, "OFFSET");
 
@@ -145,8 +146,8 @@ public class ProgramData
         var dataBlocks = new Dictionary<uint, GData>();
         foreach (XmlNode definedData in doc.SelectNodes("/PROGRAM/DATA/DEFINED_DATA")!)
         {
-            var dt = StrAttrib(definedData, "DATATYPE");
-            var dtns = StrAttrib(definedData, "DATATYPE_NAMESPACE");
+            var dt = StrAttrib(definedData, "DATATYPE") ?? "";
+            var dtns = StrAttrib(definedData, "DATATYPE_NAMESPACE") ?? "";
             var addr = HexAttrib(definedData, "ADDRESS");
             var size = UIntAttrib(definedData, "SIZE");
             dataBlocks[addr] = new GData(addr, size, BuildDummyType(dtns, dt));
@@ -157,15 +158,15 @@ public class ProgramData
         foreach (XmlNode fun in doc.SelectNodes("/PROGRAM/FUNCTIONS/FUNCTION")!)
         {
             var addr = HexAttrib(fun, "ENTRY_POINT");
-            var name = StrAttrib(fun, "NAME");
+            var name = StrAttrib(fun, "NAME") ?? "";
             symbols[addr] = name;
         }
 
         foreach (XmlNode sym in doc.SelectNodes("/PROGRAM/SYMBOL_TABLE/SYMBOL")!)
         {
             var addr = HexAttrib(sym, "ADDRESS");
-            var name = StrAttrib(sym, "NAME");
-            var ns = StrAttrib(sym, "NAMESPACE");
+            var name = StrAttrib(sym, "NAME") ?? "";
+            var ns = StrAttrib(sym, "NAMESPACE") ?? "";
             if (dataBlocks.TryGetValue(addr, out var data))
                 Data[(ns, name)] = data;
 

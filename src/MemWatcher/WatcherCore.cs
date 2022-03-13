@@ -25,7 +25,7 @@ public sealed class WatcherCore : IDisposable
         _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         Config = config ?? throw new ArgumentNullException(nameof(config));
 
-        using(var xmlStream = File.OpenRead(xmlFilename))
+        using (var xmlStream = File.OpenRead(xmlFilename))
             _data = new ProgramData(xmlStream);
 
         var dict = new Dictionary<string, WatchNamespace>();
@@ -54,7 +54,6 @@ public sealed class WatcherCore : IDisposable
             if (watch != null)
                 watch.IsActive = true;
         }
-
     }
 
     bool IsShown(Watch watch, bool onlyShowActive)
@@ -78,14 +77,16 @@ public sealed class WatcherCore : IDisposable
 
         foreach (var ns in _namespaces)
         {
-            if (!ImGui.TreeNode(ns.Name))
+            bool rootNamespace = ns.Name == "";
+            if (!rootNamespace && !ImGui.TreeNode(ns.Name))
                 continue;
 
             foreach (var watch in ns.Watches)
                 if (IsShown(watch, onlyShowActive))
                     watch.Draw(_data.SymbolLookup);
 
-            ImGui.TreePop();
+            if (!rootNamespace)
+                ImGui.TreePop();
         }
     }
 
@@ -100,6 +101,7 @@ public sealed class WatcherCore : IDisposable
 
     public void Update()
     {
+        _data.SymbolLookup.CycleHistory();
         LastUpdateTimeUtc = DateTime.UtcNow;
         foreach (var ns in _namespaces)
             foreach (var watch in ns.Watches)

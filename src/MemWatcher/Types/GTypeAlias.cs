@@ -4,7 +4,9 @@ public class GTypeAlias : IGhidraType
 {
     public string Namespace { get; }
     public string Name { get; }
-    public uint Size => Type.Size;
+    public bool IsFixedSize => Type.IsFixedSize;
+    public uint GetSize(History? history) => Type.GetSize(history);
+    public History HistoryConstructor() => History.DefaultConstructor();
     public IGhidraType Type { get; private set; }
     public override string ToString() => $"{Name} = {Type}";
 
@@ -21,5 +23,6 @@ public class GTypeAlias : IGhidraType
             Type = types[(dummy.Namespace, dummy.Name)];
     }
 
-    public void Draw(string path, ReadOnlySpan<byte> buffer, SymbolLookup lookup) => Type.Draw(path, buffer, lookup);
+    public bool Draw(string path, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, long now, SymbolLookup lookup)
+         => Type.Draw(path, buffer, previousBuffer, now, lookup);
 }

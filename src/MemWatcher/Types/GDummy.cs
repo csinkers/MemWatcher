@@ -11,8 +11,11 @@ public class GDummy : IGhidraType
         Namespace = ns;
     }
 
-    public uint Size => 0;
+    public bool IsFixedSize => true;
+    public History HistoryConstructor() => History.DefaultConstructor();
+    public uint GetSize(History? history) => 0;
     public override string ToString() => $"Dummy({Namespace}, {Name})";
-    public void Draw(string path, ReadOnlySpan<byte> buffer, SymbolLookup lookup) => throw new NotImplementedException();
+    public bool Draw(string path, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, long now, SymbolLookup lookup)
+        => throw new NotImplementedException();
     public void Unswizzle(Dictionary<(string ns, string name), IGhidraType> types) => throw new NotImplementedException();
 }

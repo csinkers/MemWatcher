@@ -16,7 +16,9 @@ public class Watch
     public string Name { get; }
     public GData Data { get; }
     public bool IsActive { get; set; }
-    public byte[]? LastBuffer { get; set; }
+    public byte[]? PreviousBuffer { get; set; }
+    public byte[]? CurrentBuffer { get; set; }
+    public long LastChangeTimeTicks { get; set; }
     public override string ToString() => $"[{(IsActive ? 'x' : ' ')}] {Name}: {Data}";
 
     public void Draw(SymbolLookup lookup)
@@ -26,19 +28,27 @@ public class Watch
         IsActive = active;
         ImGui.SameLine();
 
-        ImGui.Text(Name + ": ");
+        long now = DateTime.UtcNow.Ticks;
+        var color = Util.ColorForAge(now - LastChangeTimeTicks);
+        ImGui.TextColored(color, Name + ": ");
         ImGui.SameLine();
-        Data.Type.Draw(Name, LastBuffer ?? Array.Empty<byte>(), lookup);
+
+        ImGui.PushID(Name);
+        if (Data.Type.Draw(Name, CurrentBuffer ?? Array.Empty<byte>(), PreviousBuffer ?? Array.Empty<byte>(), now, lookup))
+            LastChangeTimeTicks = now;
+        ImGui.PopID();
     }
 
     public void Update(IMemoryReader reader)
     {
+        PreviousBuffer = CurrentBuffer; 
+
         if (!IsActive)
         {
-            LastBuffer = null;
+            CurrentBuffer = null;
             return;
         }
 
-        LastBuffer = reader.Read(Data.Address, Data.Size);
+        CurrentBuffer = reader.Read(Data.Address, Data.Size);
     }
 }
