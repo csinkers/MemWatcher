@@ -15,9 +15,12 @@ public class GFuncParameter
         Size = size;
     }
 
-    public void Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
+    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
     {
-        if (Type is GDummy dummy)
-            Type = types[(dummy.Namespace, dummy.Name)];
+        if (Type is not GDummy dummy) 
+            return false;
+
+        Type = types[(dummy.Namespace, dummy.Name)];
+        return true;
     }
 }

@@ -22,9 +22,12 @@ public class GStructMember
 
     public override string ToString() => $"{Offset:X}: {Type.Name} {Name} ({Size:X})";
 
-    public void Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
+    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
     {
-        if (Type is GDummy dummy)
-            Type = types[(dummy.Namespace, dummy.Name)];
+        if (Type is not GDummy dummy)
+            return false;
+
+        Type = types[(dummy.Namespace, dummy.Name)];
+        return true;
     }
 }

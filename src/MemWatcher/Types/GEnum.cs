@@ -10,7 +10,7 @@ public class GEnum : IGhidraType
     public string Name { get; }
     public bool IsFixedSize => true;
     public uint GetSize(History? history) => _size;
-    public History HistoryConstructor() => History.DefaultConstructor();
+    public History HistoryConstructor(string path) => History.DefaultConstructor(path);
     public Dictionary<uint, string> Elements { get; }
     public override string ToString() => Name;
 
@@ -22,17 +22,16 @@ public class GEnum : IGhidraType
         _size = size;
     }
 
-    public bool Draw(string path, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, long now, SymbolLookup lookup)
+    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
         if (buffer.Length < _size)
         {
-            ImGui.Text("--");
+            ImGui.TextUnformatted("--");
             return false;
         }
 
-        var history = lookup.GetHistory(path, this);
-        if (!buffer.SequenceEqual(previousBuffer))
-            history.LastModifiedTicks = now;
+        if (!previousBuffer.IsEmpty && !buffer.SequenceEqual(previousBuffer))
+            history.LastModifiedTicks = context.Now;
 
         uint value = _size switch
         {
@@ -42,13 +41,13 @@ public class GEnum : IGhidraType
             _ => throw new InvalidOperationException($"Unsupported enum size {_size}")
         };
 
-        var color = Util.ColorForAge(now - history.LastModifiedTicks);
+        var color = Util.ColorForAge(context.Now - history.LastModifiedTicks);
         ImGui.TextColored(color, Elements.TryGetValue(value, out var name) 
             ? $"{name} ({value})" 
             : value.ToString());
 
-        return history.LastModifiedTicks == now;
+        return history.LastModifiedTicks == context.Now;
     }
 
-    public void Unswizzle(Dictionary<(string ns, string name), IGhidraType> types) { }
+    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types) { return false; }
 }

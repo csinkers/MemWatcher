@@ -6,7 +6,7 @@ public class GTypeAlias : IGhidraType
     public string Name { get; }
     public bool IsFixedSize => Type.IsFixedSize;
     public uint GetSize(History? history) => Type.GetSize(history);
-    public History HistoryConstructor() => History.DefaultConstructor();
+    public History HistoryConstructor(string path) => History.DefaultConstructor(path);
     public IGhidraType Type { get; private set; }
     public override string ToString() => $"{Name} = {Type}";
 
@@ -17,12 +17,15 @@ public class GTypeAlias : IGhidraType
         Type = type;
     }
 
-    public void Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
+    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
     {
-        if (Type is GDummy dummy)
-            Type = types[(dummy.Namespace, dummy.Name)];
+        if (Type is not GDummy dummy)
+            return false;
+
+        Type = types[(dummy.Namespace, dummy.Name)];
+        return true;
     }
 
-    public bool Draw(string path, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, long now, SymbolLookup lookup)
-         => Type.Draw(path, buffer, previousBuffer, now, lookup);
+    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+         => Type.Draw(history, buffer, previousBuffer, context);
 }

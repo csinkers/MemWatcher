@@ -8,7 +8,7 @@ public interface IGhidraType
     string Name { get; }
     bool IsFixedSize { get; }
     uint GetSize(History? history);
-    History HistoryConstructor();
-    bool Draw(string path, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, long now, SymbolLookup lookup);
-    void Unswizzle(Dictionary<(string ns, string name), IGhidraType> types);
+    History HistoryConstructor(string path);
+    bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context);
+    bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types);
 }

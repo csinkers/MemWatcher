@@ -9,46 +9,44 @@ public class Watch
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Data = data ?? throw new ArgumentNullException(nameof(data));
-        CheckboxId = Data.Address.ToString("X8");
+        // CheckboxId = Data.Address.ToString("X8");
+        _label = Name.Replace("%", "%%") + ": ";
     }
 
-    string CheckboxId { get; }
+    // string CheckboxId { get; }
     public string Name { get; }
     public GData Data { get; }
-    public bool IsActive { get; set; }
-    public byte[]? PreviousBuffer { get; set; }
-    public byte[]? CurrentBuffer { get; set; }
+    // public bool IsActive { get; set; }
     public long LastChangeTimeTicks { get; set; }
-    public override string ToString() => $"[{(IsActive ? 'x' : ' ')}] {Name}: {Data}";
+    // public override string ToString() => $"[{(IsActive ? 'x' : ' ')}] {Name}: {Data}";
+    public override string ToString() => $"{Name}: {Data}";
+    readonly string _label;
 
-    public void Draw(SymbolLookup lookup)
+    public void Draw(DrawContext context)
     {
-        var active = IsActive;
-        ImGui.Checkbox(CheckboxId, ref active);
-        IsActive = active;
+        // var active = IsActive;
+        // ImGui.Checkbox(CheckboxId, ref active);
+        // IsActive = active;
+        // ImGui.SameLine();
+
+        var color = Util.ColorForAge(context.Now - LastChangeTimeTicks);
+        ImGui.TextColored(color, _label);
         ImGui.SameLine();
 
-        long now = DateTime.UtcNow.Ticks;
-        var color = Util.ColorForAge(now - LastChangeTimeTicks);
-        ImGui.TextColored(color, Name + ": ");
-        ImGui.SameLine();
+        var cur = ReadOnlySpan<byte>.Empty; 
+        var prev = ReadOnlySpan<byte>.Empty;
 
-        ImGui.PushID(Name);
-        if (Data.Type.Draw(Name, CurrentBuffer ?? Array.Empty<byte>(), PreviousBuffer ?? Array.Empty<byte>(), now, lookup))
-            LastChangeTimeTicks = now;
-        ImGui.PopID();
-    }
-
-    public void Update(IMemoryReader reader)
-    {
-        PreviousBuffer = CurrentBuffer; 
-
-        if (!IsActive)
+        // if (IsActive)
         {
-            CurrentBuffer = null;
-            return;
+            cur = context.Memory.Read(Data.Address, Data.Size);
+            if (context.Refreshed)
+                prev = context.Memory.ReadPrevious(Data.Address, Data.Size);
         }
 
-        CurrentBuffer = reader.Read(Data.Address, Data.Size);
+        ImGui.PushID(Name);
+        var history = context.History.GetHistory(Name, Data.Type);
+        if (Data.Type.Draw(history, cur, prev, context))
+            LastChangeTimeTicks = context.Now;
+        ImGui.PopID();
     }
 }

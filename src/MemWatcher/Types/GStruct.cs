@@ -4,15 +4,23 @@ namespace MemWatcher.Types;
 
 public class GStruct : IGhidraType
 {
+    class StructHistory : History
+    {
+        public StructHistory(string path, string[] memberPaths) : base(path)
+            => MemberPaths = memberPaths ?? throw new ArgumentNullException(nameof(memberPaths));
+        public string[] MemberPaths { get; }
+        public override string ToString() => $"StructH:{Path}:{Util.Timestamp(LastModifiedTicks):g3}";
+    }
     public string Namespace { get; }
     public string Name { get; }
     public uint Size { get; private set; }
     public bool IsFixedSize { get; }
+    public string[] MemberNames { get; }
     public uint GetSize(History? history) => Size;
-    public History HistoryConstructor()
+    public History HistoryConstructor(string path)
     {
-        var histories = Members.Select(x => (x, (string?)null, x.Type.HistoryConstructor())).ToArray();
-        return new StructHistory(histories);
+        var memberPaths = Members.Select((x, i) => $"{path}/{i}").ToArray();
+        return new StructHistory(path, memberPaths);
     }
 
     public List<GStructMember> Members { get; }
@@ -25,35 +33,40 @@ public class GStruct : IGhidraType
         Size = size;
         IsFixedSize = true; // In case the line below results in a recursive call back to this type
         IsFixedSize = Members.All(x => x.Type.IsFixedSize);
+        MemberNames = Members.Select(x => $"[{x.Name}]".Replace("%", "%%")).ToArray();
     }
 
     public override string ToString() => $"struct {Namespace}::{Name} ({Size:X})";
-    public void Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
+    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
     {
+        bool changed = false;
         foreach (var member in Members)
-            member.Unswizzle(types);
+            changed |= member.Unswizzle(types);
+        return changed;
     }
 
-    public bool Draw(string path, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, long now, SymbolLookup lookup)
+    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+        => Draw((StructHistory)history, buffer, previousBuffer, context);
+    bool Draw(StructHistory history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
-        if (!ImGui.TreeNode(Name))
-            return !buffer.SequenceEqual(previousBuffer);
+        bool changed = false;
 
-        var history = (StructHistory)lookup.GetHistory(path, this);
+        if (!ImGui.TreeNode(Name))
+        {
+            changed = !previousBuffer.IsEmpty && !buffer.SequenceEqual(previousBuffer);
+            if (changed)
+                history.LastModifiedTicks = context.Now;
+            return changed;
+        }
 
         uint size = 0;
-        bool changed = false;
-        for (var i = 0; i < history.MemberHistories.Length; i++)
+        for (var i = 0; i < Members.Count; i++)
         {
-            var (member, memberPath, memberHistory) = history.MemberHistories[i];
-            if (memberPath == null)
-            {
-                memberPath = $"{path}/{i}";
-                history.MemberHistories[i] = (member, memberPath, memberHistory);
-            }
-
-            var color = Util.ColorForAge(now - memberHistory.LastModifiedTicks);
-            ImGui.TextColored(color, $"[{member.Name}]");
+            var member = Members[i];
+            var memberPath = history.MemberPaths[i];
+            var memberHistory = context.History.GetHistory(memberPath, member.Type);
+            var color = Util.ColorForAge(context.Now - memberHistory.LastModifiedTicks);
+            ImGui.TextColored(color, MemberNames[i]);
             ImGui.SameLine();
 
             if (!IsFixedSize)
@@ -63,9 +76,12 @@ public class GStruct : IGhidraType
             var oldSlice = Util.SafeSlice(previousBuffer, member.Offset, member.Size);
 
             ImGui.PushID(i);
-            changed |= member.Type.Draw(memberPath, slice, oldSlice, now, lookup);
+            changed |= member.Type.Draw(memberHistory, slice, oldSlice, context);
             ImGui.PopID();
         }
+
+        if (changed)
+            history.LastModifiedTicks = context.Now;
 
         if (!IsFixedSize)
             Size = size;

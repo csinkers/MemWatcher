@@ -7,6 +7,7 @@ public sealed class WatcherCore : IDisposable
     readonly List<WatchNamespace> _namespaces;
     readonly IMemoryReader _reader;
     readonly ProgramData _data;
+    readonly DrawContext _drawContext;
 
     public string? Filter { get; set; }
     public Config Config { get; }
@@ -24,10 +25,13 @@ public sealed class WatcherCore : IDisposable
     {
         _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         Config = config ?? throw new ArgumentNullException(nameof(config));
+        var cache = new MemoryCache(_reader);
+        var history = new HistoryCache();
 
         using (var xmlStream = File.OpenRead(xmlFilename))
             _data = new ProgramData(xmlStream);
 
+        _drawContext = new DrawContext(cache, history, _data.SymbolLookup);
         var dict = new Dictionary<string, WatchNamespace>();
         foreach (var kvp in _data.Data)
         {
@@ -51,8 +55,8 @@ public sealed class WatcherCore : IDisposable
             var watchPart = index == -1 ? name : name[(index + 1)..];
             var ns = _namespaces.FirstOrDefault(x => x.Name == nsPart);
             var watch = ns?.Watches.FirstOrDefault(x => x.Name == watchPart);
-            if (watch != null)
-                watch.IsActive = true;
+            // if (watch != null)
+            //     watch.IsActive = true;
         }
     }
 
@@ -61,8 +65,8 @@ public sealed class WatcherCore : IDisposable
         if (!onlyShowActive && string.IsNullOrEmpty(Filter))
             return true;
 
-        if (onlyShowActive && watch.IsActive)
-            return true;
+        // if (onlyShowActive && watch.IsActive)
+        //     return true;
 
         if (!string.IsNullOrEmpty(Filter) && watch.Name.Contains(Filter, StringComparison.OrdinalIgnoreCase))
             return true;
@@ -75,6 +79,7 @@ public sealed class WatcherCore : IDisposable
         if (ImGui.Button("Save Config"))
             SaveConfig();
 
+        _drawContext.Now = DateTime.UtcNow.Ticks;
         foreach (var ns in _namespaces)
         {
             bool rootNamespace = ns.Name == "";
@@ -83,29 +88,30 @@ public sealed class WatcherCore : IDisposable
 
             foreach (var watch in ns.Watches)
                 if (IsShown(watch, onlyShowActive))
-                    watch.Draw(_data.SymbolLookup);
+                    watch.Draw(_drawContext);
 
             if (!rootNamespace)
                 ImGui.TreePop();
         }
+
+        _drawContext.Refreshed = false;
     }
 
     void SaveConfig()
     {
         Config.Watches.Clear();
         foreach (var ns in _namespaces)
-            foreach (var watch in ns.Watches.Where(watch => watch.IsActive))
+            foreach (var watch in ns.Watches/*.Where(watch => watch.IsActive)*/)
                 Config.Watches.Add(ns.Name + "/" + watch.Name);
         Config.Save();
     }
 
     public void Update()
     {
-        _data.SymbolLookup.CycleHistory();
+        _drawContext.History.CycleHistory();
+        _drawContext.Memory.Refresh();
+        _drawContext.Refreshed = true;
         LastUpdateTimeUtc = DateTime.UtcNow;
-        foreach (var ns in _namespaces)
-            foreach (var watch in ns.Watches)
-                watch.Update(_reader);
     }
 
     public void Dispose() => _reader.Dispose();

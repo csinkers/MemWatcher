@@ -19,27 +19,37 @@ public class GFuncPointer : IGhidraType
     public List<GFuncParameter> Parameters { get; }
     public bool IsFixedSize => true;
     public uint GetSize(History? history) => Constants.PointerSize;
-    public History HistoryConstructor() => History.DefaultConstructor();
+    public History HistoryConstructor(string path) => History.DefaultConstructor(path);
 
-    public void Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
+    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
     {
+        bool changed = false;
         if (ReturnType is GDummy dummy)
+        {
             ReturnType = types[(dummy.Namespace, dummy.Name)];
+            changed = true;
+        }
 
         foreach(var p in Parameters)
-            p.Unswizzle(types);
+            changed |= p.Unswizzle(types);
+        return changed;
     }
 
-    public bool Draw(string path, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, long now, SymbolLookup lookup)
+    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
-        var history = lookup.GetHistory(path, this);
-        if (!buffer.SequenceEqual(previousBuffer))
-            history.LastModifiedTicks = now;
+        if (buffer.IsEmpty)
+        {
+            ImGui.TextUnformatted("--");
+            return false;
+        }
 
-        var color = Util.ColorForAge(now - history.LastModifiedTicks);
+        if (!previousBuffer.IsEmpty && !buffer.SequenceEqual(previousBuffer))
+            history.LastModifiedTicks = context.Now;
+
+        var color = Util.ColorForAge(context.Now - history.LastModifiedTicks);
         var address = MemoryMarshal.Read<uint>(buffer);
-        ImGui.TextColored(color, lookup.Describe(address));
+        ImGui.TextColored(color, context.Lookup.Describe(address)); // TODO: Ensure unformatted
 
-        return history.LastModifiedTicks == now;
+        return history.LastModifiedTicks == context.Now;
     }
 }

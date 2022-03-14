@@ -62,13 +62,17 @@ public static class Program
             ImGui.Checkbox("Only Show Active", ref onlyShowActive);
 
             ImGui.Columns(2);
-            ImGui.DragInt("Interval (ms)", ref interval, 1.0f, 100, 5000);
+            ImGui.DragInt("Interval (ms)", ref interval, 1.0f, 1, 5000);
             ImGui.NextColumn();
-            ImGui.Text($"Last refresh took {sw.ElapsedMilliseconds} ms");
+            ImGui.TextUnformatted($"Last refresh took {sw.ElapsedMilliseconds} ms");
             ImGui.Columns(1);
 
             if (ImGui.InputText("Filter", filterBuf, (uint)filterBuf.Length))
-                core.Filter = Encoding.UTF8.GetString(filterBuf).TrimEnd('\0');
+            {
+                var raw = Encoding.UTF8.GetString(filterBuf);
+                int zeroIndex = raw.IndexOf('\0');
+                core.Filter = zeroIndex == -1 ? raw : raw[..zeroIndex];
+            }
 
             if ((DateTime.UtcNow - core.LastUpdateTimeUtc).TotalMilliseconds > interval)
             {

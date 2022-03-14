@@ -22,6 +22,13 @@ public class ProgramData
         IGhidraType BuildDummyType(string ns, string name)
         {
             name = name.Trim();
+
+            if (Types.TryGetValue((ns, name), out var existing))
+                return existing;
+
+            if (name == "char *")
+                return new GPointer(BuildDummyType(ns, "string"));
+
             if (name.EndsWith('*'))
             {
                 var result = new GPointer(BuildDummyType(ns, name[..^1]));
@@ -39,9 +46,6 @@ public class ProgramData
                 Types[(ns, name)] = result;
                 return result;
             }
-
-            if (Types.TryGetValue((ns, name), out var existing))
-                return existing;
 
             return new GDummy(ns, name);
         }

@@ -2,7 +2,14 @@
 
 public class History
 {
-    public History() => LastModifiedTicks = DateTime.UtcNow.Ticks;
+    public string Path { get; }
+    public History(string path)
+    {
+        Path = path;
+        LastModifiedTicks = DateTime.UtcNow.Ticks;
+    }
+
     public long LastModifiedTicks { get; set; }
-    public static History DefaultConstructor() => new() { LastModifiedTicks = DateTime.UtcNow.Ticks };
+    public override string ToString() => $"H:{Path}:{Util.Timestamp(LastModifiedTicks):g3}";
+    public static History DefaultConstructor(string path) => new(path) { LastModifiedTicks = DateTime.UtcNow.Ticks };
 }

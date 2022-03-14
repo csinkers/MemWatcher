@@ -5,6 +5,15 @@ namespace MemWatcher.Types;
 
 public class GArray : IGhidraType
 {
+    class ArrayHistory : History
+    {
+        public ArrayHistory(string path, string[] elementPaths) : base(path)
+            => ElementPaths = elementPaths ?? throw new ArgumentNullException(nameof(elementPaths));
+
+        public string[] ElementPaths { get; }
+        public override string ToString() => $"ArrayH:{Path}:{Util.Timestamp(LastModifiedTicks):g3}";
+    }
+
     static readonly List<string> NumberLabels = new();
 
     public bool IsFixedSize => true;
@@ -20,10 +29,13 @@ public class GArray : IGhidraType
             NumberLabels.Add($"[{NumberLabels.Count}] ");
     }
 
-    public void Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
+    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
     {
-        if (Type is GDummy dummy)
-            Type = types[(dummy.Namespace, dummy.Name)];
+        if (Type is not GDummy dummy) 
+            return false;
+
+        Type = types[(dummy.Namespace, dummy.Name)];
+        return true;
     }
 
     public string Name
@@ -46,26 +58,31 @@ public class GArray : IGhidraType
 
     public string Namespace => Type.Namespace;
     public uint GetSize(History? history) => Type.GetSize(null) * Count;
-    public History HistoryConstructor() => new ArrayHistory(new string[Count]);
+    public History HistoryConstructor(string path)
+    {
+        var elemPaths = Enumerable.Range(0, (int)Count).Select(x => $"{path}/{x}").ToArray();
+        return new ArrayHistory(path, elemPaths);
+    }
 
-    public bool Draw(string path, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, long now, SymbolLookup lookup)
+    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+        => Draw((ArrayHistory)history, buffer, previousBuffer, context);
+    bool Draw(ArrayHistory history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
         if (Count == 0)
         {
-            ImGui.Text("<EMPTY>");
+            ImGui.TextUnformatted("<EMPTY>");
             return false;
         }
 
         if (Type == GPrimitive.Char)
         {
-            var charHistory = lookup.GetHistory(path, this);
-            if (!buffer.SequenceEqual(previousBuffer))
-                charHistory.LastModifiedTicks = now;
+            if (!previousBuffer.IsEmpty && !buffer.SequenceEqual(previousBuffer))
+                history.LastModifiedTicks = context.Now;
 
             var str = Constants.Encoding.GetString(buffer);
-            var color = Util.ColorForAge(now - charHistory.LastModifiedTicks);
-            ImGui.TextColored(color, str);
-            return charHistory.LastModifiedTicks == now;
+            var color = Util.ColorForAge(context.Now - history.LastModifiedTicks);
+            ImGui.TextColored(color, str.Replace("%", "%%"));
+            return history.LastModifiedTicks == context.Now;
         }
 
         bool openAll = ImGui.Button("+"); ImGui.SameLine();
@@ -74,24 +91,27 @@ public class GArray : IGhidraType
         if (openAll) ImGui.SetNextItemOpen(true);
         if (closeAll) ImGui.SetNextItemOpen(false);
 
+        bool changed = false;
+
         if (!ImGui.TreeNode(Name))
         {
+            changed = !previousBuffer.IsEmpty && !buffer.SequenceEqual(previousBuffer);
+            if (changed)
+                history.LastModifiedTicks = context.Now;
+
             if (closeAll)
                 ImGui.TreePush(Name);
             else
-                return false;
+                return changed;
         }
 
-        var history = (ArrayHistory)lookup.GetHistory(path, this);
-        if (history.Paths[0] == null)
-            for (uint i = 0; i < Count; i++)
-                history.Paths[i] = $"{path}/{i}";
-
-        bool changed = false;
         var size = Type.GetSize(null);
         for (int i = 0; i < Count; i++)
         {
-            ImGui.Text(NumberLabels[i]);
+            var elemHistory = context.History.GetHistory(history.ElementPaths[i], Type);
+            var color = Util.ColorForAge(context.Now - elemHistory.LastModifiedTicks);
+
+            ImGui.TextColored(color, NumberLabels[i]);
             ImGui.SameLine();
             var slice = Util.SafeSlice(buffer, (uint)i * size, size);
             var oldSlice = Util.SafeSlice(previousBuffer, (uint)i * size, size);
@@ -99,9 +119,12 @@ public class GArray : IGhidraType
             ImGui.PushID(i);
             if (openAll) ImGui.SetNextItemOpen(true);
             if (closeAll) ImGui.SetNextItemOpen(false);
-            changed |= Type.Draw(history.Paths[i]!, slice, oldSlice, now, lookup);
+            changed |= Type.Draw(elemHistory, slice, oldSlice, context);
             ImGui.PopID();
         }
+
+        if (changed)
+            history.LastModifiedTicks = context.Now;
 
         ImGui.TreePop();
         return changed;

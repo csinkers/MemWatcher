@@ -4,6 +4,13 @@ namespace MemWatcher.Types;
 
 public class GString : IGhidraType
 {
+    class StringHistory : History
+    {
+        public uint Size { get; set; }
+        public StringHistory(string path) : base(path) { }
+        public override string ToString() => $"StringH:{Path}:{Util.Timestamp(LastModifiedTicks):g3}";
+    }
+
     const int MaxStringLength = 1024;
     const uint InitialSize = 32;
     GString() { }
@@ -12,8 +19,12 @@ public class GString : IGhidraType
     public string Name => "string";
     public bool IsFixedSize => false;
     public uint GetSize(History? history) => ((StringHistory?)history)?.Size ?? InitialSize;
-    public History HistoryConstructor() => new StringHistory();
-    public bool Draw(string path, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, long now, SymbolLookup lookup)
+    public History HistoryConstructor(string path) => new StringHistory(path);
+
+    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+        => Draw((StringHistory)history, buffer, previousBuffer);
+
+    static bool Draw(StringHistory history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer)
     {
         int zeroIndex = -1;
         for (int i = 0; i < buffer.Length; i++)
@@ -25,7 +36,6 @@ public class GString : IGhidraType
             }
         }
 
-        var history = (StringHistory)lookup.GetHistory(path, this);
         if (zeroIndex == -1)
         {
             if (history.Size == 0)
@@ -38,18 +48,19 @@ public class GString : IGhidraType
 
             zeroIndex = buffer.Length - 1;
         }
+        else
+            history.Size = (uint)zeroIndex + 1;
 
         if (zeroIndex == -1)
         {
-            ImGui.Text("");
+            ImGui.TextUnformatted("");
             return false;
         }
 
-        history.Size = (uint)zeroIndex + 1;
-
-        ImGui.Text(Constants.Encoding.GetString(buffer[..zeroIndex]));
-        return buffer.SequenceEqual(previousBuffer);
+        var text = Constants.Encoding.GetString(buffer[..zeroIndex]);
+        ImGui.TextUnformatted("\"" + text + "\"");
+        return !previousBuffer.IsEmpty && !buffer.SequenceEqual(previousBuffer);
     }
 
-    public void Unswizzle(Dictionary<(string ns, string name), IGhidraType> types) { }
+    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types) { return false; }
 }

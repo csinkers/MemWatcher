@@ -32,12 +32,12 @@ public sealed class MemoryReader : IMemoryReader
         _handle = handle;
     }
 
-    public byte[]? Read(uint offset, uint size)
+    public void Read(uint offset, byte[] buffer)
     {
         uint bytesRead = 0;
-        var buffer = new byte[size];
-        NativeImports.NtReadVirtualMemory(_handle, (IntPtr)offset, buffer, size, ref bytesRead);
-        return bytesRead == 0 ? null : buffer;
+        NativeImports.NtReadVirtualMemory(_handle, (IntPtr)offset, buffer, (uint)buffer.Length, ref bytesRead);
+        if (bytesRead < buffer.Length)
+            Array.Fill<byte>(buffer, 0, (int)bytesRead, (int)(buffer.Length - bytesRead));
     }
 
     public uint GetModuleAddress(string name)

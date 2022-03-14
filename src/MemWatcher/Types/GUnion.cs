@@ -18,19 +18,21 @@ public class GUnion : IGhidraType
     public string Name { get; }
     public bool IsFixedSize => true;
     public uint GetSize(History? history) => _size;
-    public History HistoryConstructor() => History.DefaultConstructor();
+    public History HistoryConstructor(string path) => History.DefaultConstructor(path);
     public List<GStructMember> Members { get; }
 
     public override string ToString() => $"union {Namespace}::{Name} ({_size:X})";
-    public void Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
+    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
     {
+        bool changed = false;
         foreach (var member in Members)
-            member.Unswizzle(types);
+            changed |= member.Unswizzle(types);
+        return changed;
     }
 
-    public bool Draw(string path, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, long now, SymbolLookup lookup)
+    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
-        ImGui.Text("<UNION TODO>");
+        ImGui.TextUnformatted("<UNION TODO>");
         return false;
     }
 }

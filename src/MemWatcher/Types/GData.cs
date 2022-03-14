@@ -14,9 +14,12 @@ public class GData
         Type = type ?? throw new ArgumentNullException(nameof(type));
     }
 
-    public void Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
+    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
     {
-        if (Type is GDummy dummy)
-            Type = types[(dummy.Namespace, dummy.Name)];
+        if (Type is not GDummy dummy) 
+            return false;
+
+        Type = types[(dummy.Namespace, dummy.Name)];
+        return true;
     }
 }
