@@ -108,7 +108,7 @@ public class GArray : IGhidraType
         var size = Type.GetSize(null);
         for (int i = 0; i < Count; i++)
         {
-            var elemHistory = context.History.GetHistory(history.ElementPaths[i], Type);
+            var elemHistory = context.History.GetOrCreateHistory(history.ElementPaths[i], Type);
             var color = Util.ColorForAge(context.Now - elemHistory.LastModifiedTicks);
 
             ImGui.TextColored(color, NumberLabels[i]);

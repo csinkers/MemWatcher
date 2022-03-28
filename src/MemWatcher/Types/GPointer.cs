@@ -43,7 +43,13 @@ public class GPointer : IGhidraType
 
         if (ImGui.TreeNode(Name))
         {
-            var referentHistory = context.History.GetHistory(history.ReferentPath, Type);
+            var referentHistory = context.History.GetOrCreateHistory(history.ReferentPath, Type);
+            if (history.Directives != null)
+            {
+                referentHistory.Directives = history.Directives;
+                history.Directives = null;
+            }
+
             var size = Type.GetSize(referentHistory);
             var slice = context.Memory.Read(address, size);
             var oldSlice = context.Memory.ReadPrevious(address, size);

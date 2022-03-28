@@ -10,5 +10,5 @@ public interface IGhidraType
     uint GetSize(History? history);
     History HistoryConstructor(string path);
     bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context);
-    bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types);
+    bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types); // Return true if any types were resolved
 }

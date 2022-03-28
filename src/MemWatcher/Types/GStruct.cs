@@ -6,11 +6,19 @@ public class GStruct : IGhidraType
 {
     class StructHistory : History
     {
-        public StructHistory(string path, string[] memberPaths) : base(path)
-            => MemberPaths = memberPaths ?? throw new ArgumentNullException(nameof(memberPaths));
+        public StructHistory(string path, string[] memberPaths, IGhidraType[] memberTypes) : base(path)
+        {
+            MemberPaths = memberPaths ?? throw new ArgumentNullException(nameof(memberPaths));
+            MemberTypes = memberTypes ?? throw new ArgumentNullException(nameof(memberTypes));
+        }
+
         public string[] MemberPaths { get; }
+        public IGhidraType[] MemberTypes { get; }
+
         public override string ToString() => $"StructH:{Path}:{Util.Timestamp(LastModifiedTicks):g3}";
     }
+
+    public List<GStructMember> Members { get; }
     public string Namespace { get; }
     public string Name { get; }
     public uint Size { get; private set; }
@@ -20,10 +28,18 @@ public class GStruct : IGhidraType
     public History HistoryConstructor(string path)
     {
         var memberPaths = Members.Select((x, i) => $"{path}/{i}").ToArray();
-        return new StructHistory(path, memberPaths);
-    }
+        var memberTypes = Members.Select(x => x.Type).ToArray();
 
-    public List<GStructMember> Members { get; }
+        List<IDirective>? directives = null;
+        foreach (var member in Members)
+        {
+            if (member.Directives == null) continue;
+            directives ??= new List<IDirective>();
+            directives.AddRange(member.Directives);
+        }
+
+        return new StructHistory(path, memberPaths, memberTypes) { Directives = directives };
+    }
 
     public GStruct(string ns, string name, uint size, List<GStructMember> members)
     {
@@ -62,21 +78,23 @@ public class GStruct : IGhidraType
         uint size = 0;
         for (var i = 0; i < Members.Count; i++)
         {
-            var member = Members[i];
-            var memberPath = history.MemberPaths[i];
-            var memberHistory = context.History.GetHistory(memberPath, member.Type);
+            GStructMember member = Members[i];
+            string memberPath = history.MemberPaths[i];
+            var memberHistory = context.History.TryGetHistory(memberPath) ?? InitialiseMemberHistory(i, history, context.History);
+            var memberType = history.MemberTypes[i];
+
             var color = Util.ColorForAge(context.Now - memberHistory.LastModifiedTicks);
             ImGui.TextColored(color, MemberNames[i]);
             ImGui.SameLine();
 
             if (!IsFixedSize)
-                size += member.Type.GetSize(memberHistory);
+                size += memberType.GetSize(memberHistory);
 
             var slice = Util.SafeSlice(buffer, member.Offset, member.Size);
             var oldSlice = Util.SafeSlice(previousBuffer, member.Offset, member.Size);
 
             ImGui.PushID(i);
-            changed |= member.Type.Draw(memberHistory, slice, oldSlice, context);
+            changed |= memberType.Draw(memberHistory, slice, oldSlice, context);
             ImGui.PopID();
         }
 
@@ -88,5 +106,33 @@ public class GStruct : IGhidraType
 
         ImGui.TreePop();
         return changed;
+    }
+
+    History InitialiseMemberHistory(int index, StructHistory history, HistoryCache historyCache)
+    {
+        GStructMember member = Members[index];
+        string memberPath = history.MemberPaths[index];
+        List<IDirective>? memberDirectives = null;
+
+        if (history.Directives != null)
+        {
+            foreach (var directive in history.Directives)
+            {
+                if (directive is not DTargetChild(var path, var childDirective) || path != member.Name) continue;
+                if (childDirective is DTypeCast cast)
+                {
+                    history.MemberTypes[index] = cast.Type;
+                    continue;
+                }
+
+                memberDirectives ??= new List<IDirective>();
+                memberDirectives.Add(childDirective);
+            }
+        }
+
+        var memberHistory = historyCache.CreateHistory(memberPath, history.MemberTypes[index]);
+        if (memberDirectives != null)
+            memberHistory.Directives = memberDirectives;
+        return memberHistory;
     }
 }

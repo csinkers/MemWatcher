@@ -119,7 +119,8 @@ public class ProgramData
                 if (string.IsNullOrEmpty(memberName))
                     memberName = $"unk{offset:X}";
 
-                members.Add(new GStructMember(memberName, type, offset, UIntAttrib(member, "SIZE"), StrAttrib(member, "COMMENT")));
+                var commentNode = member.ChildNodes.OfType<XmlNode>().FirstOrDefault(x => x.Name == "REGULAR_CMT");
+                members.Add(new GStructMember(memberName, type, offset, UIntAttrib(member, "SIZE"), commentNode?.InnerText));
             }
             Types.Add((ns, name), new GStruct(ns, name, size, members));
         }
@@ -176,6 +177,20 @@ public class ProgramData
 
             if (!name.StartsWith("case"))
                 symbols[addr] = name;
+        }
+
+        var parser = new DirectiveParser(BuildDummyType);
+        foreach (var key in Types.Keys.ToList())
+        {
+            var type = Types[key];
+            if (type is not GStruct structType) continue;
+            foreach (var member in structType.Members)
+            {
+                if (member.Comment == null) continue;
+                member.Directives = parser.TryParse(member.Comment).ToList();
+                if (member.Directives.Count == 0)
+                    member.Directives = null;
+            }
         }
 
         foreach (var key in Types.Keys.ToList())

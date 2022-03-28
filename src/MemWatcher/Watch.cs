@@ -44,7 +44,7 @@ public class Watch
         }
 
         ImGui.PushID(Name);
-        var history = context.History.GetHistory(Name, Data.Type);
+        var history = context.History.GetOrCreateHistory(Name, Data.Type);
         if (Data.Type.Draw(history, cur, prev, context))
             LastChangeTimeTicks = context.Now;
         ImGui.PopID();
