@@ -16,10 +16,12 @@ public class GUnion : IGhidraType
 
     public string Namespace { get; }
     public string Name { get; }
+    public List<GStructMember> Members { get; }
     public bool IsFixedSize => true;
     public uint GetSize(History? history) => _size;
-    public History HistoryConstructor(string path) => History.DefaultConstructor(path);
-    public List<GStructMember> Members { get; }
+    public History HistoryConstructor(string path, Func<string, string, string?> resolvePath) => History.DefaultConstructor(path, this);
+    public string? BuildPath(string accum, string relative) => null; // TODO
+
 
     public override string ToString() => $"union {Namespace}::{Name} ({_size:X})";
     public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
@@ -30,8 +32,9 @@ public class GUnion : IGhidraType
         return changed;
     }
 
-    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+    public bool Draw(History history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
+        history.LastAddress = address;
         ImGui.TextUnformatted("<UNION TODO>");
         return false;
     }

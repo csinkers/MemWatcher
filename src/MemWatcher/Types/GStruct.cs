@@ -6,7 +6,7 @@ public class GStruct : IGhidraType
 {
     class StructHistory : History
     {
-        public StructHistory(string path, string[] memberPaths, IGhidraType[] memberTypes) : base(path)
+        public StructHistory(string path, IGhidraType type, string[] memberPaths, IGhidraType[] memberTypes) : base(path, type)
         {
             MemberPaths = memberPaths ?? throw new ArgumentNullException(nameof(memberPaths));
             MemberTypes = memberTypes ?? throw new ArgumentNullException(nameof(memberTypes));
@@ -25,9 +25,9 @@ public class GStruct : IGhidraType
     public bool IsFixedSize { get; }
     public string[] MemberNames { get; }
     public uint GetSize(History? history) => Size;
-    public History HistoryConstructor(string path)
+    public History HistoryConstructor(string path, Func<string, string, string?> resolvePath)
     {
-        var memberPaths = Members.Select((x, i) => $"{path}/{i}").ToArray();
+        var memberPaths = Members.Select((_, i) => $"{path}/{i}").ToArray();
         var memberTypes = Members.Select(x => x.Type).ToArray();
 
         List<IDirective>? directives = null;
@@ -38,7 +38,27 @@ public class GStruct : IGhidraType
             directives.AddRange(member.Directives);
         }
 
-        return new StructHistory(path, memberPaths, memberTypes) { Directives = directives };
+        return new StructHistory(path, this, memberPaths, memberTypes) { Directives = directives };
+    }
+
+    public string? BuildPath(string accum, string relative)
+    {
+        int dotIndex = relative.IndexOf('.');
+        var part = dotIndex == -1 ? relative : relative[..dotIndex];
+        var remainder = dotIndex == -1 ? "" : relative[(dotIndex + 1)..];
+
+        for (int i = 0; i < Members.Count; i++)
+        {
+            var member = Members[i];
+            if (member.Name == part)
+            {
+                accum += '/';
+                accum += i.ToString();
+                return remainder.Length == 0 ? accum : member.Type.BuildPath(accum, remainder);
+            }
+        }
+
+        return null;
     }
 
     public GStruct(string ns, string name, uint size, List<GStructMember> members)
@@ -61,11 +81,12 @@ public class GStruct : IGhidraType
         return changed;
     }
 
-    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
-        => Draw((StructHistory)history, buffer, previousBuffer, context);
-    bool Draw(StructHistory history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+    public bool Draw(History history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+        => Draw((StructHistory)history, address, buffer, previousBuffer, context);
+    bool Draw(StructHistory history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
         bool changed = false;
+        history.LastAddress = address;
 
         if (!ImGui.TreeNode(Name))
         {
@@ -90,11 +111,12 @@ public class GStruct : IGhidraType
             if (!IsFixedSize)
                 size += memberType.GetSize(memberHistory);
 
+            uint memberAddress = address + member.Offset;
             var slice = Util.SafeSlice(buffer, member.Offset, member.Size);
             var oldSlice = Util.SafeSlice(previousBuffer, member.Offset, member.Size);
 
             ImGui.PushID(i);
-            changed |= memberType.Draw(memberHistory, slice, oldSlice, context);
+            changed |= memberType.Draw(memberHistory, memberAddress, slice, oldSlice, context);
             ImGui.PopID();
         }
 

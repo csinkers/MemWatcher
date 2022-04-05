@@ -7,7 +7,7 @@ public class GString : IGhidraType
     class StringHistory : History
     {
         public uint Size { get; set; }
-        public StringHistory(string path) : base(path) { }
+        public StringHistory(string path, IGhidraType type) : base(path, type) { }
         public override string ToString() => $"StringH:{Path}:{Util.Timestamp(LastModifiedTicks):g3}";
     }
 
@@ -19,13 +19,15 @@ public class GString : IGhidraType
     public string Name => "string";
     public bool IsFixedSize => false;
     public uint GetSize(History? history) => ((StringHistory?)history)?.Size ?? InitialSize;
-    public History HistoryConstructor(string path) => new StringHistory(path);
+    public History HistoryConstructor(string path, Func<string, string, string?> resolvePath) => new StringHistory(path, this);
+    public string? BuildPath(string accum, string relative) => null;
 
-    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
-        => Draw((StringHistory)history, buffer, previousBuffer);
+    public bool Draw(History history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+        => Draw((StringHistory)history, address, buffer, previousBuffer);
 
-    static bool Draw(StringHistory history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer)
+    static bool Draw(StringHistory history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer)
     {
+        history.LastAddress = address;
         int zeroIndex = -1;
         for (int i = 0; i < buffer.Length; i++)
         {

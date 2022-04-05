@@ -9,21 +9,26 @@ public class DirectiveParser
 
     /* Syntax:
 
-    cast\(([^,]+), (.+)\) - perform typecast on member
+    #cast\(([^,]+), (.+)\) - perform typecast on member
+    #gfx(width, height, stride, palette) - display as 8bpp graphics
 
     */
-    static readonly Regex CastRegex = new(@"cast\(([^,]+), (.+)\)");
+    static readonly Regex CastRegex = new(@"cast\(([^,]+),(.+)\)");
+    static readonly Regex GfxRegex = new(@"gfx8\(([^,]+),([^,]+),([^,]+),([^,]+)\)");
     public DirectiveParser(Func<string, string, IGhidraType> buildDummyType) 
         => _buildDummyType = buildDummyType ?? throw new ArgumentNullException(nameof(buildDummyType));
 
-    public IEnumerable<IDirective> TryParse(string comment)
+    public IEnumerable<IDirective> TryParse(string comment, string memberName)
     {
-        var directives = comment.Split('#');
-        foreach (var directive in directives.Skip(1))
+        var parts = comment.Split('#');
+        foreach (var part in parts.Skip(1))
         {
-            var cast = TryParseCast(directive);
-            if (cast != null)
-                yield return cast;
+            var result =
+                TryParseCast(part) ??
+                TryParseGfx(part, memberName);
+
+            if (result != null)
+                yield return result;
         }
     }
 
@@ -39,14 +44,28 @@ public class DirectiveParser
         var typeKey = SplitType(typeName);
 
         var dummyType = _buildDummyType(typeKey.ns, typeKey.name);
-        return BuildDirectiveForPath(parts, new DTypeCast(dummyType));
+        IDirective directive = new DTypeCast(dummyType);
+
+        for (int i = parts.Length - 1; i >= 0; i--)
+            directive = new DTargetChild(parts[i].Trim(), directive);
+
+        return directive;
     }
 
-    static IDirective BuildDirectiveForPath(string[] parts, IDirective directive)
+    static IDirective? TryParseGfx(string comment, string memberName)
     {
-        for (int i = parts.Length - 1; i >= 0; i--)
-            directive = new DTargetChild(parts[i], directive);
-        return directive;
+        var castMatch = GfxRegex.Match(comment);
+        if (!castMatch.Success) 
+            return null;
+
+        var width = castMatch.Groups[1].Value.Trim();
+        var height = castMatch.Groups[2].Value.Trim();
+        var stride = castMatch.Groups[3].Value.Trim();
+        var palette = castMatch.Groups[4].Value.Trim();
+
+        var type = new GGraphics(width, height, stride, palette);
+        var cast = new DTypeCast(type);
+        return new DTargetChild(memberName, cast);
     }
 
     static (string ns, string name) SplitType(string typeName)

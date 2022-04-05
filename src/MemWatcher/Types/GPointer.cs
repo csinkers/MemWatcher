@@ -6,7 +6,7 @@ public class GPointer : IGhidraType
 {
     class PointerHistory : History
     {
-        public PointerHistory(string path) : base(path) { }
+        public PointerHistory(string path, IGhidraType type) : base(path, type) { }
         public string? ReferentPath { get; set; }
         public override string ToString() => $"PtrH:{Path}:{Util.Timestamp(LastModifiedTicks):g3}";
     }
@@ -17,14 +17,22 @@ public class GPointer : IGhidraType
     public IGhidraType Type { get; private set; }
     public bool IsFixedSize => true;
     public uint GetSize(History? history) => Constants.PointerSize;
-    public History HistoryConstructor(string path) => new PointerHistory(path);
+    public History HistoryConstructor(string path, Func<string, string, string?> resolvePath) => new PointerHistory(path, this);
+
+    public string? BuildPath(string accum, string relative)
+    {
+        accum += '*';
+        return Type.BuildPath(accum, relative);
+    }
+
     public override string ToString() => Name;
 
-    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
-        => Draw((PointerHistory)history, buffer, previousBuffer, context);
+    public bool Draw(History history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+        => Draw((PointerHistory)history, address, buffer, previousBuffer, context);
 
-    bool Draw(PointerHistory history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+    bool Draw(PointerHistory history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
+        history.LastAddress = address;
         if (buffer.Length < Constants.PointerSize)
         {
             ImGui.TextUnformatted("--");
@@ -37,8 +45,8 @@ public class GPointer : IGhidraType
             history.LastModifiedTicks = context.Now;
 
         var color = Util.ColorForAge(context.Now - history.LastModifiedTicks);
-        var address = BitConverter.ToUInt32(buffer);
-        ImGui.TextColored(color, context.Lookup.Describe(address)); // TODO: Ensure unformatted
+        var targetAddress = BitConverter.ToUInt32(buffer);
+        ImGui.TextColored(color, context.Lookup.Describe(targetAddress)); // TODO: Ensure unformatted
         ImGui.SameLine();
 
         if (ImGui.TreeNode(Name))
@@ -51,11 +59,11 @@ public class GPointer : IGhidraType
             }
 
             var size = Type.GetSize(referentHistory);
-            var slice = context.Memory.Read(address, size);
-            var oldSlice = context.Memory.ReadPrevious(address, size);
+            var slice = context.Memory.Read(targetAddress, size);
+            var oldSlice = context.Memory.ReadPrevious(targetAddress, size);
 
             ImGui.SetNextItemOpen(true);
-            if (Type.Draw(referentHistory, slice, oldSlice, context))
+            if (Type.Draw(referentHistory, targetAddress, slice, oldSlice, context))
                 history.LastModifiedTicks = context.Now;
 
             ImGui.TreePop();

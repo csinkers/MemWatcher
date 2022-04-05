@@ -6,9 +6,26 @@ namespace MemWatcher;
 
 public class ProgramData
 {
+    readonly (uint Address, string Name)[] _symbols;
     public Dictionary<(string ns, string name), IGhidraType> Types { get; } = new();
-    public Dictionary<(string, string), GData> Data { get; } = new();
-    public SymbolLookup SymbolLookup { get; }
+    public GNamespace Root { get; }
+
+    public string Describe(uint address)
+    {
+        if (address == 0)
+            return "(null)";
+
+        var index = FindNearest(address);
+        var symbol = _symbols[index];
+        var delta = (int)(address - symbol.Address);
+        var sign = delta < 0 ? '-' : '+';
+        var absDelta = Math.Abs(delta);
+        return delta > 0 
+            ? $"{symbol.Name}{sign}0x{absDelta:X} ({address:X})" 
+            : symbol.Name;
+    }
+
+    int FindNearest(uint address) => Util.FindNearest(_symbols, address);
 
     public ProgramData(Stream xmlStream)
     {
@@ -21,6 +38,7 @@ public class ProgramData
 
         IGhidraType BuildDummyType(string ns, string name)
         {
+            ns = ns.Trim();
             name = name.Trim();
 
             if (Types.TryGetValue((ns, name), out var existing))
@@ -148,14 +166,14 @@ public class ProgramData
             Types.Add((ns, name), new GUnion(ns, name, size, members));
         }
 
-        var dataBlocks = new Dictionary<uint, GData>();
+        var dataBlocks = new Dictionary<uint, GGlobal>();
         foreach (XmlNode definedData in doc.SelectNodes("/PROGRAM/DATA/DEFINED_DATA")!)
         {
             var dt = StrAttrib(definedData, "DATATYPE") ?? "";
             var dtns = StrAttrib(definedData, "DATATYPE_NAMESPACE") ?? "";
             var addr = HexAttrib(definedData, "ADDRESS");
             var size = UIntAttrib(definedData, "SIZE");
-            dataBlocks[addr] = new GData(addr, size, BuildDummyType(dtns, dt));
+            dataBlocks[addr] = new GGlobal(addr, size, BuildDummyType(dtns, dt));
         }
 
         var symbols = new Dictionary<uint, string>();
@@ -167,13 +185,18 @@ public class ProgramData
             symbols[addr] = name;
         }
 
+        Dictionary<(string, string), GGlobal> globalVariables = new();
         foreach (XmlNode sym in doc.SelectNodes("/PROGRAM/SYMBOL_TABLE/SYMBOL")!)
         {
             var addr = HexAttrib(sym, "ADDRESS");
             var name = StrAttrib(sym, "NAME") ?? "";
             var ns = StrAttrib(sym, "NAMESPACE") ?? "";
             if (dataBlocks.TryGetValue(addr, out var data))
-                Data[(ns, name)] = data;
+            {
+                data.Namespace = ns;
+                data.Name = name;
+                globalVariables[(ns, name)] = data;
+            }
 
             if (!name.StartsWith("case"))
                 symbols[addr] = name;
@@ -187,7 +210,7 @@ public class ProgramData
             foreach (var member in structType.Members)
             {
                 if (member.Comment == null) continue;
-                member.Directives = parser.TryParse(member.Comment).ToList();
+                member.Directives = parser.TryParse(member.Comment, member.Name).ToList();
                 if (member.Directives.Count == 0)
                     member.Directives = null;
             }
@@ -199,10 +222,35 @@ public class ProgramData
             type.Unswizzle(Types);
         }
 
-        foreach (var kvp in Data)
+        foreach (var kvp in globalVariables)
             kvp.Value.Unswizzle(Types);
 
-        SymbolLookup = new SymbolLookup(symbols.Select(x => (x.Key, x.Value)).OrderBy(x => x.Key).ToArray());
+        _symbols = symbols.Select(x => (x.Key, x.Value)).OrderBy(x => x.Key).ToArray();
+        var namespaces = new Dictionary<string, GNamespace>();
+        Root = new GNamespace(Constants.RootNamespaceName);
+        namespaces[""] = Root;
+
+        GNamespace GetOrAddNamespace(string ns)
+        {
+            if (namespaces.TryGetValue(ns, out var result))
+                return result;
+
+            var parts = ns.Split('/');
+            var cur = Root;
+            foreach (var part in parts)
+                cur = Root.GetOrAddNamespace(part);
+
+            namespaces[ns] = cur;
+            return cur;
+        }
+
+        foreach (var kvp in globalVariables)
+        {
+            var ns = GetOrAddNamespace(kvp.Key.Item1);
+            ns.Members.Add(kvp.Value);
+        }
+
+        Root.Sort();
     }
 
     static string? StrAttrib(XmlNode node, string name) => node.Attributes![name]?.Value;

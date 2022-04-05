@@ -10,7 +10,7 @@ public class GEnum : IGhidraType
     public string Name { get; }
     public bool IsFixedSize => true;
     public uint GetSize(History? history) => _size;
-    public History HistoryConstructor(string path) => History.DefaultConstructor(path);
+    public History HistoryConstructor(string path, Func<string, string, string?> resolvePath) => History.DefaultConstructor(path, this);
     public Dictionary<uint, string> Elements { get; }
     public override string ToString() => Name;
 
@@ -22,8 +22,9 @@ public class GEnum : IGhidraType
         _size = size;
     }
 
-    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+    public bool Draw(History history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
+        history.LastAddress = address;
         if (buffer.Length < _size)
         {
             ImGui.TextUnformatted("--");
@@ -49,5 +50,6 @@ public class GEnum : IGhidraType
         return history.LastModifiedTicks == context.Now;
     }
 
+    public string? BuildPath(string accum, string relative) => null;
     public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types) { return false; }
 }

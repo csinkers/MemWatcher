@@ -19,7 +19,8 @@ public class GFuncPointer : IGhidraType
     public List<GFuncParameter> Parameters { get; }
     public bool IsFixedSize => true;
     public uint GetSize(History? history) => Constants.PointerSize;
-    public History HistoryConstructor(string path) => History.DefaultConstructor(path);
+    public History HistoryConstructor(string path, Func<string, string, string?> resolvePath) => History.DefaultConstructor(path, this);
+    public string? BuildPath(string accum, string relative) => null;
 
     public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
     {
@@ -35,8 +36,9 @@ public class GFuncPointer : IGhidraType
         return changed;
     }
 
-    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+    public bool Draw(History history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
+        history.LastAddress = address;
         if (buffer.IsEmpty)
         {
             ImGui.TextUnformatted("--");
@@ -47,8 +49,8 @@ public class GFuncPointer : IGhidraType
             history.LastModifiedTicks = context.Now;
 
         var color = Util.ColorForAge(context.Now - history.LastModifiedTicks);
-        var address = MemoryMarshal.Read<uint>(buffer);
-        ImGui.TextColored(color, context.Lookup.Describe(address)); // TODO: Ensure unformatted
+        var targetAddress = MemoryMarshal.Read<uint>(buffer);
+        ImGui.TextColored(color, context.Lookup.Describe(targetAddress)); // TODO: Ensure unformatted
 
         return history.LastModifiedTicks == context.Now;
     }

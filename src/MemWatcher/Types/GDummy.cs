@@ -14,12 +14,13 @@ public class GDummy : IGhidraType
     }
 
     public bool IsFixedSize => true;
-    public History HistoryConstructor(string path) => History.DefaultConstructor(path);
+    public History HistoryConstructor(string path, Func<string, string, string?> resolvePath) => History.DefaultConstructor(path, this);
+    public string? BuildPath(string accum, string relative) => null;
     public uint GetSize(History? history) => 0;
     public override string ToString() => $"Dummy({Namespace}, {Name})";
     string? _label;
 
-    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+    public bool Draw(History history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
         _label ??= $"<DUMMY TYPE {Namespace}/{Name}>";
         ImGui.TextUnformatted(_label);

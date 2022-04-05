@@ -12,6 +12,7 @@
     <PackageReference Include="System.Text.Encoding.CodePages" Version="6.0.0" />
     <PackageReference Include="Veldrid" Version="4.8.0" />
     <PackageReference Include="Veldrid.ImGui" Version="5.72.0" />
+    <PackageReference Include="Veldrid.RenderDoc" Version="1.0.1" />
     <PackageReference Include="Veldrid.StartupUtilities" Version="4.8.0" />
   </ItemGroup>
 

@@ -5,6 +5,8 @@ namespace MemWatcher;
 public static class Constants
 {
     public const uint PointerSize = 4;
+    public const string SpecialNamespace = "_";
+    public const string RootNamespaceName = "";
     public static Encoding Encoding { get; }
 
     static Constants()

@@ -20,11 +20,13 @@ public class GPrimitive : IGhidraType
     public string Name { get; }
     public bool IsFixedSize => true;
     public uint GetSize(History? history) => _size;
-    public History HistoryConstructor(string path) => History.DefaultConstructor(path);
+    public History HistoryConstructor(string path, Func<string, string, string?> resolvePath) => History.DefaultConstructor(path, this);
+    public string? BuildPath(string accum, string relative) => null;
 
     public override string ToString() => Name;
-    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+    public bool Draw(History history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
+        history.LastAddress = address;
         if (_size == 0)
         {
             ImGui.TextUnformatted("");

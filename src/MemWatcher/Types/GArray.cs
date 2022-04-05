@@ -7,7 +7,7 @@ public class GArray : IGhidraType
 {
     class ArrayHistory : History
     {
-        public ArrayHistory(string path, string[] elementPaths) : base(path)
+        public ArrayHistory(string path, IGhidraType type, string[] elementPaths) : base(path, type)
             => ElementPaths = elementPaths ?? throw new ArgumentNullException(nameof(elementPaths));
 
         public string[] ElementPaths { get; }
@@ -58,16 +58,31 @@ public class GArray : IGhidraType
 
     public string Namespace => Type.Namespace;
     public uint GetSize(History? history) => Type.GetSize(null) * Count;
-    public History HistoryConstructor(string path)
+    public History HistoryConstructor(string path, Func<string, string, string?> resolvePath)
     {
         var elemPaths = Enumerable.Range(0, (int)Count).Select(x => $"{path}/{x}").ToArray();
-        return new ArrayHistory(path, elemPaths);
+        return new ArrayHistory(path, this, elemPaths);
     }
 
-    public bool Draw(History history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
-        => Draw((ArrayHistory)history, buffer, previousBuffer, context);
-    bool Draw(ArrayHistory history, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+    public string? BuildPath(string accum, string relative)
     {
+        int dotIndex = relative.IndexOf('.');
+        var part = dotIndex == -1 ? relative : relative[..dotIndex];
+        var remainder = dotIndex == -1 ? "" : relative[(dotIndex + 1)..];
+
+        if (!int.TryParse(part, out _)) 
+            return null;
+
+        accum += '/';
+        accum += part;
+        return remainder.Length == 0 ? accum : Type.BuildPath(accum, remainder);
+    }
+
+    public bool Draw(History history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+        => Draw((ArrayHistory)history, address, buffer, previousBuffer, context);
+    bool Draw(ArrayHistory history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
+    {
+        history.LastAddress = address;
         if (Count == 0)
         {
             ImGui.TextUnformatted("<EMPTY>");
@@ -113,13 +128,14 @@ public class GArray : IGhidraType
 
             ImGui.TextColored(color, NumberLabels[i]);
             ImGui.SameLine();
+            uint elemAddress = address + (uint)i * size;
             var slice = Util.SafeSlice(buffer, (uint)i * size, size);
             var oldSlice = Util.SafeSlice(previousBuffer, (uint)i * size, size);
 
             ImGui.PushID(i);
             if (openAll) ImGui.SetNextItemOpen(true);
             if (closeAll) ImGui.SetNextItemOpen(false);
-            changed |= Type.Draw(elemHistory, slice, oldSlice, context);
+            changed |= Type.Draw(elemHistory, elemAddress, slice, oldSlice, context);
             ImGui.PopID();
         }
 

@@ -13,15 +13,23 @@ public static class Program
     const string ProcessName = @"SR-Main";
     public static void Main()
     {
+#if RENDERDOC
+        RenderDoc.Load(out var renderDoc);
+        bool capturePending = false;
+#endif
+
         VeldridStartup.CreateWindowAndGraphicsDevice(
             new WindowCreateInfo(100, 100, 800, 1024, WindowState.Normal, "MemWatcher"),
+            new GraphicsDeviceOptions(true) { SyncToVerticalBlank = true },
+            GraphicsBackend.Direct3D11,
             out var window,
             out var gd);
-        gd.SyncToVerticalBlank = true;
 
         var imguiRenderer = new ImGuiRenderer(
-            gd, gd.MainSwapchain.Framebuffer.OutputDescription,
-            (int)gd.MainSwapchain.Framebuffer.Width, (int)gd.MainSwapchain.Framebuffer.Height);
+            gd,
+            gd.MainSwapchain.Framebuffer.OutputDescription,
+            (int)gd.MainSwapchain.Framebuffer.Width,
+            (int)gd.MainSwapchain.Framebuffer.Height);
 
         var cl = gd.ResourceFactory.CreateCommandList();
         window.Resized += () =>
@@ -32,14 +40,26 @@ public static class Program
 
         var config = Config.Load();
         var reader = MemoryReader.Attach(ProcessName);
-        var core = new WatcherCore(SymbolPath, reader, config);
+        var textures = new TextureStore(gd, imguiRenderer);
+        var core = new WatcherCore(SymbolPath, reader, config, textures);
         var sw = new Stopwatch();
         int interval = 100;
-        bool onlyShowActive = false;
+        // bool onlyShowActive = false;
+
+        ImGui.PushStyleColor(ImGuiCol.WindowBg, new Vector4(0.1f, 0.1f, 0.1f, 1.0f));
 
         var filterBuf = new byte[128];
         while (window.Exists)
         {
+#if RENDERDOC
+            if (capturePending)
+            {
+                renderDoc.TriggerCapture();
+                capturePending = false;
+            }
+#endif
+
+            textures.Cycle();
             var input = window.PumpEvents();
             if (!window.Exists)
                 break;
@@ -56,10 +76,21 @@ public static class Program
                 reader.Dispose();
 
                 reader = MemoryReader.Attach(ProcessName);
-                core = new WatcherCore(SymbolPath, reader, config);
+                core = new WatcherCore(SymbolPath, reader, config, textures);
             }
+
+#if RENDERDOC
             ImGui.SameLine();
-            ImGui.Checkbox("Only Show Active", ref onlyShowActive);
+            if (ImGui.Button("RenderDoc Snapshot"))
+                capturePending = true;
+
+            ImGui.SameLine();
+            if (ImGui.Button("Open RenderDoc"))
+                renderDoc.LaunchReplayUI();
+#endif
+
+            // ImGui.SameLine();
+            // ImGui.Checkbox("Only Show Active", ref onlyShowActive);
 
             ImGui.Columns(2);
             ImGui.DragInt("Interval (ms)", ref interval, 1.0f, 1, 5000);
@@ -83,7 +114,7 @@ public static class Program
             }
 
             ImGui.BeginChild("Data");
-            core.Draw(onlyShowActive);
+            core.Draw();
             ImGui.EndChild();
 
             ImGui.End();
