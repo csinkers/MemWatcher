@@ -1,0 +1,406 @@
+﻿using System.Globalization;
+using System.Text.RegularExpressions;
+using System.Xml;
+
+namespace CorrelateSymbols;
+
+public class ProgramData
+{
+    readonly (uint Address, string Name)[] _symbols;
+    public GFunction[] Functions { get; } // All functions ordered by address
+    public Dictionary<TypeKey, GFunction> FunctionLookup { get; } = new();
+    public Dictionary<TypeKey, IGhidraType> Types { get; } = new();
+    public GNamespace Root { get; }
+
+    public string Describe(uint address)
+    {
+        if (address == 0)
+            return "(null)";
+
+        var index = FindNearest(address);
+        var symbol = _symbols[index];
+        var delta = (int)(address - symbol.Address);
+        var sign = delta < 0 ? '-' : '+';
+        var absDelta = Math.Abs(delta);
+        return delta > 0 
+            ? $"{symbol.Name}{sign}0x{absDelta:X} ({address:X})" 
+            : symbol.Name;
+    }
+
+    int FindNearest(uint address) => Util.FindNearest(_symbols, address);
+
+    public ProgramData(string xmlPath, Func<string, bool> functionFilter)
+    {
+        var doc = new XmlDocument();
+        using (var xmlStream = new StreamReader(xmlPath))
+            doc.Load(xmlStream);
+
+        Types[GString.Instance.Key] = GString.Instance;
+        foreach (var primitive in GPrimitive.PrimitiveTypes)
+            Types[primitive.Key] = primitive;
+
+        IGhidraType BuildDummyType(TypeKey key)
+        {
+            key = new(key.Namespace.Trim(), key.Name.Trim());
+
+            if (Types.TryGetValue(key, out var existing))
+                return existing;
+
+            if (key.Name == "char *")
+                return new GPointer(BuildDummyType(key with { Name = "string" }));
+
+            if (key.Name.EndsWith('*'))
+            {
+                var result = new GPointer(BuildDummyType(key with { Name = key.Name[..^1] }));
+                Types[key] = result;
+                return result;
+            }
+
+            int index = key.Name.IndexOf('[');
+            if (index != -1)
+            {
+                int index2 = key.Name.IndexOf(']');
+                var subString = key.Name[(index + 1)..index2];
+                var count = uint.Parse(subString);
+                var result = new GArray(BuildDummyType(key with { Name = key.Name[..index] + key.Name[(index2 + 1)..] }), count);
+                Types[key] = result;
+                return result;
+            }
+
+            return new GDummy(key);
+        }
+
+        foreach (XmlNode enumDef in doc.SelectNodes("/PROGRAM/DATATYPES/ENUM")!)
+        {
+            var ns = StrAttrib(enumDef, "NAMESPACE") ?? "";
+            var name = StrAttrib(enumDef, "NAME") ?? "";
+            var key = new TypeKey(ns, name);
+            var size = UIntAttrib(enumDef, "SIZE");
+
+            var elems = new Dictionary<uint, string>();
+            foreach (var elem in enumDef.ChildNodes.OfType<XmlNode>().Where(x => x.Name == "ENUM_ENTRY"))
+                elems[UIntAttrib(elem, "VALUE")] = StrAttrib(elem, "NAME") ?? "";
+
+            var ge = new GEnum(key, size, elems);
+            Types.Add(key, ge);
+        }
+
+        foreach (XmlNode typeDef in doc.SelectNodes("/PROGRAM/DATATYPES/TYPE_DEF")!)
+        {
+            var ns = StrAttrib(typeDef, "NAMESPACE") ?? "";
+            var name = StrAttrib(typeDef, "NAME") ?? "";
+            var key = new TypeKey(ns, name);
+
+            var dtns = StrAttrib(typeDef, "DATATYPE_NAMESPACE") ?? "";
+            var type = StrAttrib(typeDef, "DATATYPE") ?? "";
+            var td = new GTypeAlias(key, BuildDummyType(new(dtns, type)));
+            if (Types.TryGetValue(key, out var existing) && existing is not GDummy)
+                throw new InvalidOperationException($"The type {ns}/{name} is already defined as {existing}");
+
+            Types[key] = td;
+        }
+
+        foreach (XmlNode funcDef in doc.SelectNodes("/PROGRAM/DATATYPES/FUNCTION_DEF")!)
+        {
+            var ns = StrAttrib(funcDef, "NAMESPACE") ?? "";
+            var name = StrAttrib(funcDef, "NAME") ?? "";
+            var key = new TypeKey(ns, name);
+
+            IGhidraType returnType = GPrimitive.Void;
+            var returnTypeNode = funcDef.SelectSingleNode("RETURN_TYPE");
+            if (returnTypeNode != null)
+            {
+                var dtns = StrAttrib(returnTypeNode, "DATATYPE_NAMESPACE") ?? "";
+                var type = StrAttrib(returnTypeNode, "DATATYPE") ?? "";
+                returnType = BuildDummyType(new(dtns, type));
+            }
+
+            List<GFuncParameter> parameters = new();
+            foreach (var parameter in funcDef.ChildNodes.OfType<XmlNode>().Where(x => x.Name == "PARAMETER"))
+            {
+                var ordinal = UIntAttrib(parameter, "ORDINAL");
+                var paramName = StrAttrib(parameter, "NAME") ?? "";
+                var size = UIntAttrib(parameter, "SIZE");
+                var dtns = StrAttrib(parameter, "DATATYPE_NAMESPACE") ?? "";
+                var type = StrAttrib(parameter, "DATATYPE") ?? "";
+                parameters.Add(new GFuncParameter(ordinal, paramName, size, BuildDummyType(new(dtns, type))));
+            }
+
+            var td = new GFuncPointer(key, returnType, parameters);
+            Types.Add(key, td);
+        }
+
+        foreach (XmlNode structDef in doc.SelectNodes("/PROGRAM/DATATYPES/STRUCTURE")!)
+        {
+            var ns = StrAttrib(structDef, "NAMESPACE") ?? "";
+            var name = StrAttrib(structDef, "NAME") ?? "";
+            var key = new TypeKey(ns, name);
+            var size = UIntAttrib(structDef, "SIZE");
+
+            var members = new List<GStructMember>();
+            foreach (var member in structDef.ChildNodes.OfType<XmlNode>().Where(x => x.Name == "MEMBER"))
+            {
+                var dns = StrAttrib(member, "DATATYPE_NAMESPACE") ?? "";
+                var dname = StrAttrib(member, "DATATYPE") ?? "";
+                var type = BuildDummyType(new(dns, dname));
+                var memberName = StrAttrib(member, "NAME");
+                var offset = UIntAttrib(member, "OFFSET");
+
+                if (string.IsNullOrEmpty(memberName))
+                    memberName = $"unk{offset:X}";
+
+                var commentNode = member.ChildNodes.OfType<XmlNode>().FirstOrDefault(x => x.Name == "REGULAR_CMT");
+                members.Add(new GStructMember(memberName, type, offset, UIntAttrib(member, "SIZE"), commentNode?.InnerText));
+            }
+
+            Types.Add(key, new GStruct(key, size, members));
+        }
+
+        foreach (XmlNode unionDef in doc.SelectNodes("/PROGRAM/DATATYPES/UNION")!)
+        {
+            var ns = StrAttrib(unionDef, "NAMESPACE") ?? "";
+            var name = StrAttrib(unionDef, "NAME") ?? "";
+            var size = UIntAttrib(unionDef, "SIZE");
+            var key = new TypeKey(ns, name);
+
+            var members = new List<GStructMember>();
+            foreach (var member in unionDef.ChildNodes.OfType<XmlNode>().Where(x => x.Name == "MEMBER"))
+            {
+                var dns = StrAttrib(member, "DATATYPE_NAMESPACE") ?? "";
+                var dname = StrAttrib(member, "DATATYPE") ?? "";
+
+                var type = BuildDummyType(new(dns, dname));
+                var memberName = StrAttrib(member, "NAME");
+                var offset = UIntAttrib(member, "OFFSET");
+
+                if (string.IsNullOrEmpty(memberName))
+                    memberName = $"unk{offset:X}";
+
+                members.Add(new GStructMember(memberName, type, offset, UIntAttrib(member, "SIZE"), StrAttrib(member, "COMMENT")));
+            }
+
+
+            Types.Add(key, new GUnion(key, size, members));
+        }
+
+        var dataBlocks = new Dictionary<uint, GGlobal>();
+        foreach (XmlNode definedData in doc.SelectNodes("/PROGRAM/DATA/DEFINED_DATA")!)
+        {
+            var dns = StrAttrib(definedData, "DATATYPE_NAMESPACE") ?? "";
+            var dname = StrAttrib(definedData, "DATATYPE") ?? "";
+            uint? addr = HexAttrib(definedData, "ADDRESS");
+            if (addr == null)
+                continue;
+
+            var size = UIntAttrib(definedData, "SIZE");
+            dataBlocks[addr.Value] = new GGlobal(addr.Value, size, BuildDummyType(new(dns, dname)));
+        }
+
+        var symbols = new Dictionary<uint, string>();
+
+        foreach (XmlNode fun in doc.SelectNodes("/PROGRAM/FUNCTIONS/FUNCTION")!)
+        {
+            var addr = HexAttrib(fun, "ENTRY_POINT");
+            if (addr == null)
+                continue;
+
+            var name = StrAttrib(fun, "NAME") ?? "";
+            symbols[addr.Value] = name;
+        }
+
+        Dictionary<TypeKey, GGlobal> globalVariables = new();
+        foreach (XmlNode sym in doc.SelectNodes("/PROGRAM/SYMBOL_TABLE/SYMBOL")!)
+        {
+            var addr = HexAttrib(sym, "ADDRESS");
+            if (addr == null)
+                continue;
+
+            var name = StrAttrib(sym, "NAME") ?? "";
+            var ns = StrAttrib(sym, "NAMESPACE") ?? "";
+            var key = new TypeKey(ns, name);
+
+            if (dataBlocks.TryGetValue(addr.Value, out var data))
+            {
+                data.Key = key;
+                globalVariables[key] = data;
+            }
+
+            if (!name.StartsWith("case"))
+                symbols[addr.Value] = name;
+        }
+
+        foreach (var key in Types.Keys.ToList())
+        {
+            var type = Types[key];
+            type.Unswizzle(Types);
+        }
+
+        foreach (var kvp in globalVariables)
+            kvp.Value.Unswizzle(Types);
+
+        _symbols = symbols.Select(x => (x.Key, x.Value)).OrderBy(x => x.Key).ToArray();
+        var namespaces = new Dictionary<string, GNamespace>();
+        Root = new GNamespace(Constants.RootNamespaceName);
+        namespaces[""] = Root;
+
+        GNamespace GetOrAddNamespace(string ns)
+        {
+            if (namespaces.TryGetValue(ns, out var result))
+                return result;
+
+            var parts = ns.Split('/');
+            var cur = Root;
+            foreach (var part in parts)
+                cur = Root.GetOrAddNamespace(part);
+
+            namespaces[ns] = cur;
+            return cur;
+        }
+
+        foreach (var kvp in globalVariables)
+        {
+            var ns = GetOrAddNamespace(kvp.Key.Namespace);
+            ns.Members.Add(kvp.Value);
+        }
+
+        Root.Sort();
+
+        // Functions
+        var regions = new List<(uint Start, uint End)>();
+        foreach (XmlNode fn in doc.SelectNodes("/PROGRAM/FUNCTIONS/FUNCTION")!)
+        {
+            var addr = HexAttrib(fn, "ENTRY_POINT");
+            if (addr == null)
+                continue;
+
+            var name = StrAttrib(fn, "NAME") ?? "";
+            var ns = StrAttrib(fn, "NAMESPACE") ?? "";
+            var key = new TypeKey(ns, name);
+
+            uint maxAddr = addr.Value;
+            regions.Clear();
+            foreach (XmlNode range in fn.SelectNodes("ADDRESS_RANGE")!)
+            {
+                var begin = HexAttrib(range, "START");
+                var end = HexAttrib(range, "END");
+
+                if (begin == null || end == null)
+                    continue;
+
+                if (end > maxAddr)
+                    maxAddr = end.Value;
+
+                regions.Add((begin.Value, end.Value));
+            }
+
+            if (FunctionLookup.TryGetValue(key, out var existing))
+            {
+                Console.WriteLine($"WARN: {key} already exists");
+                continue;
+            }
+
+            var entry = new GFunction(key, addr.Value, maxAddr);
+            foreach(var region in regions)
+                entry.Regions.Add(region);
+
+            FunctionLookup.Add(key, entry);
+        }
+
+        Functions = FunctionLookup.Values.OrderBy(x => x.Address).ToArray();
+        for (int i = 0; i < Functions.Length; i++)
+        {
+            var fn = Functions[i];
+            fn.IsIgnored = !functionFilter(fn.Key.Name);
+            fn.Index = i;
+        }
+
+        PopulateCalls(Path.ChangeExtension(xmlPath, ".txt"));
+    }
+
+    static string? StrAttrib(XmlNode node, string name) => node.Attributes![name]?.Value;
+    static uint UIntAttrib(XmlNode node, string name)
+    {
+        var value = node.Attributes![name]?.Value ?? throw new InvalidOperationException($"Attribute {name} was not found on node {node}!");
+        return (value.StartsWith("0x"))
+            ? uint.Parse(value[2..], NumberStyles.HexNumber)
+            : uint.Parse(value);
+    }
+
+    static uint? HexAttrib(XmlNode node, string name)
+    {
+        var value = node.Attributes![name]?.Value ?? throw new InvalidOperationException($"Attribute {name} was not found on node {node}!");
+        if (value.Contains(":")) // Skip entries like .image::OTHER:00000000 for headers in LE EXEs
+            return null;
+
+        return uint.Parse(value, NumberStyles.HexNumber);
+    }
+
+    static readonly Regex CallLineRegex = new(@"^([0-9a-f]{8})\s+[0-9a-f]+\s+CALL\s+([^ ]+)\s+$", RegexOptions.Compiled);
+    readonly record struct CallInfo(uint Address, string Target);
+    void PopulateCalls(string path)
+    {
+        var calls = new List<CallInfo>();
+
+        using (var reader = new StreamReader(path))
+        {
+            while (reader.ReadLine() is { } line)
+            {
+                var m = CallLineRegex.Match(line);
+                if (m.Success)
+                {
+                    var addr = uint.Parse(m.Groups[1].Value, NumberStyles.HexNumber);
+                    calls.Add(new(addr, m.Groups[2].Value));
+                }
+            }
+        }
+
+        calls.Sort((x, y) => Comparer<uint>.Default.Compare(x.Address, y.Address));
+
+        int index = 0;
+        foreach (var fn in Functions)
+        {
+            foreach (var (start, end) in fn.Regions)
+            {
+                // If we've gone too far, rewind
+                while (index >= calls.Count || index > 0 && calls[index].Address > start)
+                    index--;
+
+                // Skip any calls before the function
+                for (; index < calls.Count; index++)
+                {
+                    var call = calls[index];
+
+                    if (call.Address < start)
+                        continue;
+
+                    if (call.Address > end)
+                        break;
+
+                    if (call.Target.StartsWith("LAB_")) continue;
+                    if (call.Target.Contains("=>")) continue;
+                    switch (call.Target)
+                    {
+                        case "EAX":
+                        case "EBX":
+                        case "ECX":
+                        case "EDX":
+                        case "ESI":
+                        case "EDI":
+                            continue;
+                    }
+
+                    if (FunctionLookup.TryGetValue(new TypeKey("", call.Target), out var resolved))
+                    {
+                        if (!resolved.IsIgnored)
+                        {
+                            fn.Callees.Add(resolved);
+                            resolved.Callers.Add(fn);
+                        }
+                    }
+                    else
+                        Console.WriteLine($"Could not resolve call target {call.Target}");
+                }
+            }
+        }
+    }
+}
