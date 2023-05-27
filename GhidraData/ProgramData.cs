@@ -2,7 +2,7 @@
 using System.Text.RegularExpressions;
 using System.Xml;
 
-namespace CorrelateSymbols;
+namespace GhidraData;
 
 public class ProgramData
 {
@@ -277,7 +277,6 @@ public class ProgramData
             var ns = StrAttrib(fn, "NAMESPACE") ?? "";
             var key = new TypeKey(ns, name);
 
-            uint maxAddr = addr.Value;
             regions.Clear();
             foreach (XmlNode range in fn.SelectNodes("ADDRESS_RANGE")!)
             {
@@ -287,19 +286,16 @@ public class ProgramData
                 if (begin == null || end == null)
                     continue;
 
-                if (end > maxAddr)
-                    maxAddr = end.Value;
-
                 regions.Add((begin.Value, end.Value));
             }
 
-            if (FunctionLookup.TryGetValue(key, out var existing))
+            if (FunctionLookup.ContainsKey(key))
             {
                 Console.WriteLine($"WARN: {key} already exists");
                 continue;
             }
 
-            var entry = new GFunction(key, addr.Value, maxAddr);
+            var entry = new GFunction(key, addr.Value);
             foreach(var region in regions)
                 entry.Regions.Add(region);
 
@@ -339,6 +335,9 @@ public class ProgramData
     readonly record struct CallInfo(uint Address, string Target);
     void PopulateCalls(string path)
     {
+        if (!File.Exists(path)) // Load ASCII dump as well if it exists to get call info
+            return;
+
         var calls = new List<CallInfo>();
 
         using (var reader = new StreamReader(path))

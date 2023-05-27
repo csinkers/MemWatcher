@@ -1,4 +1,4 @@
-﻿namespace CorrelateSymbols;
+﻿namespace GhidraData;
 
 public class GEnum : IGhidraType
 {

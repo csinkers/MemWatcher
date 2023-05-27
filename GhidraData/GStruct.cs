@@ -1,4 +1,4 @@
-﻿namespace CorrelateSymbols;
+﻿namespace GhidraData;
 
 public class GStruct : IGhidraType
 {
@@ -18,7 +18,7 @@ public class GStruct : IGhidraType
         MemberNames = Members.Select(x => $"[{x.Name}]".Replace("%", "%%")).ToArray();
     }
 
-    public override string ToString() => $"struct {Key.Namespace}::{Key.Name} ({Size:X})";
+    public override string ToString() => Key.Name; //$"struct {Key.Namespace}::{Key.Name} ({Size:X})";
     public bool Unswizzle(Dictionary<TypeKey, IGhidraType> types)
     {
         bool changed = false;

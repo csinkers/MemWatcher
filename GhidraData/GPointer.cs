@@ -1,4 +1,4 @@
-﻿namespace CorrelateSymbols;
+﻿namespace GhidraData;
 
 public class GPointer : IGhidraType
 {
@@ -6,7 +6,7 @@ public class GPointer : IGhidraType
     public TypeKey Key => Type.Key;
     public IGhidraType Type { get; private set; }
     public bool IsFixedSize => true;
-    public override string ToString() => Key.Name;
+    public override string ToString() => Key.Name + " *";
 
     public bool Unswizzle(Dictionary<TypeKey, IGhidraType> types)
     {

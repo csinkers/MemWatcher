@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace CorrelateSymbols;
+namespace GhidraData;
 
 public static class Constants
 {

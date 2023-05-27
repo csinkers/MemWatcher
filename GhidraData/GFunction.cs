@@ -1,8 +1,8 @@
 ﻿using System.Text.RegularExpressions;
 
-namespace CorrelateSymbols;
+namespace GhidraData;
 
-public record GFunction(TypeKey Key, uint Address, uint MaxAddress)
+public record GFunction(TypeKey Key, uint Address)
 {
     static readonly Regex DefaultName = new(@"^(FUN|LAB)_[0-9a-f]{8}$", RegexOptions.Compiled);
 
@@ -23,13 +23,10 @@ public record GFunction(TypeKey Key, uint Address, uint MaxAddress)
         }
     }
 
-    public IEnumerable<int> CalleeIndices => Indices(Callees);
-    public IEnumerable<int> CallerIndices => Indices(Callers);
-
     public override string ToString()
     {
-        var callees = string.Join(", ", CalleeIndices);
-        var callers = string.Join(", ", CallerIndices);
+        var callees = string.Join(", ", Indices(Callees));
+        var callers = string.Join(", ", Indices(Callers));
         return $"{Callees.Count:D3} {Callers.Count:D3} {Key.Name}: {callees} | {callers}";
     }
 }

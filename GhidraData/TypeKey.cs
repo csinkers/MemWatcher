@@ -1,4 +1,4 @@
-﻿namespace CorrelateSymbols;
+﻿namespace GhidraData;
 
 public readonly record struct TypeKey(string Namespace, string Name)
 {

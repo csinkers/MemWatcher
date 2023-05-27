@@ -1,4 +1,4 @@
-﻿namespace CorrelateSymbols;
+﻿namespace GhidraData;
 
 public class GString : IGhidraType
 {
@@ -7,4 +7,5 @@ public class GString : IGhidraType
     public TypeKey Key => new("/", "string");
     public bool IsFixedSize => false;
     public bool Unswizzle(Dictionary<TypeKey, IGhidraType> types) { return false; }
+    public override string ToString() => "string";
 }

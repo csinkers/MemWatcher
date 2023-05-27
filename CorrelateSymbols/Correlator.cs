@@ -2,13 +2,14 @@
 using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
+using GhidraData;
 using ImGuiNET;
 
 namespace CorrelateSymbols;
 
 public class Correlator
 {
-    const int MaxSearchDistance = 100;
+    const int MaxSearchDistance = 1000;
     readonly ProgramData _left;
     readonly ProgramData _right;
     readonly string _savePath;
@@ -45,7 +46,19 @@ public class Correlator
     void Load()
     {
         if (!File.Exists(_savePath))
+        {
+            // Match by name
+            foreach (var left in _left.Functions)
+            {
+                if (_right.FunctionLookup.TryGetValue(left.Key, out var right))
+                {
+                    _leftToRight[left] = right;
+                    _rightToLeft[right] = left;
+                }
+            }
+
             return;
+        }
 
         _leftToRight.Clear();
         _rightToLeft.Clear();
@@ -242,7 +255,7 @@ public class Correlator
         if (leftString.Length == rightString.Length && leftString.Length == 0)
             return 0.0f;
 
-        int distance = LevenshteinDistance.Calculate(leftString, rightString);
+        int distance = Util.LevenshteinDistance(leftString, rightString);
         float d = 1.0f - (float)distance / Math.Max(leftString.Length, rightString.Length);
         return d;
     }

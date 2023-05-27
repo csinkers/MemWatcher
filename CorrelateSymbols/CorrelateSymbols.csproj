@@ -14,4 +14,8 @@
     <PackageReference Include="Veldrid.RenderDoc" Version="1.0.1" />
     <PackageReference Include="Veldrid.StartupUtilities" Version="4.8.0" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GhidraData\GhidraData.csproj" />
+  </ItemGroup>
 </Project>

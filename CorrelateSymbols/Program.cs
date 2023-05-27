@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using GhidraData;
 using ImGuiNET;
 using Veldrid;
 using Veldrid.StartupUtilities;
