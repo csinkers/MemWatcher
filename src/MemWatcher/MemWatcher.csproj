@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\GhidraData\GhidraData.csproj" />
+    <ProjectReference Include="..\GhidraData\GhidraData.csproj" />
   </ItemGroup>
 
 </Project>

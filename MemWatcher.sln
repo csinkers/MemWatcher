@@ -9,11 +9,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MemWatcher.Tests", "src\Mem
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestProgram", "src\TestProgram\TestProgram.vcxproj", "{541A5462-5049-4025-AD59-87BA4F2EE9E3}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CorrelateSymbols", "CorrelateSymbols\CorrelateSymbols.csproj", "{FCB9F1A4-53A2-4274-87FC-319ECA56A7F2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CorrelateSymbols", "src\CorrelateSymbols\CorrelateSymbols.csproj", "{FCB9F1A4-53A2-4274-87FC-319ECA56A7F2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GhidraData", "GhidraData\GhidraData.csproj", "{6C656859-91A8-4799-BB8E-9CA267D745CD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GhidraData", "src\GhidraData\GhidraData.csproj", "{6C656859-91A8-4799-BB8E-9CA267D745CD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataCorrelator", "DataCorrelator\DataCorrelator.csproj", "{B3E8273C-7465-49EA-9151-EBEF829E5608}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataCorrelator", "src\DataCorrelator\DataCorrelator.csproj", "{B3E8273C-7465-49EA-9151-EBEF829E5608}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
