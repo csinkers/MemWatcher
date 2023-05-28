@@ -13,10 +13,11 @@ public class GUnion : IGhidraType
 
     public TypeKey Key { get; }
     public List<GStructMember> Members { get; }
-    public bool IsFixedSize => true;
+    public uint? FixedSize => _size;
+    public string? BuildPath(string accum, string relative) => null; // TODO
 
     public override string ToString() => $"union {Key.Namespace}::{Key.Name} ({_size:X})";
-    public bool Unswizzle(Dictionary<TypeKey, IGhidraType> types)
+    public bool Unswizzle(TypeStore types)
     {
         bool changed = false;
         foreach (var member in Members)

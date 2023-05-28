@@ -1,11 +1,10 @@
 ﻿using System.Text.RegularExpressions;
-using MemWatcher.Types;
 
-namespace MemWatcher;
+namespace GhidraData;
 
 public class DirectiveParser
 {
-    readonly Func<string, string, IGhidraType> _buildDummyType;
+    readonly Func<TypeKey, IGhidraType> _buildDummyType;
 
     /* Syntax:
 
@@ -15,7 +14,7 @@ public class DirectiveParser
     */
     static readonly Regex CastRegex = new(@"cast\(([^,]+),(.+)\)");
     static readonly Regex GfxRegex = new(@"gfx8\(([^,]+),([^,]+),([^,]+),([^,]+)\)");
-    public DirectiveParser(Func<string, string, IGhidraType> buildDummyType) 
+    public DirectiveParser(Func<TypeKey, IGhidraType> buildDummyType) 
         => _buildDummyType = buildDummyType ?? throw new ArgumentNullException(nameof(buildDummyType));
 
     public IEnumerable<IDirective> TryParse(string comment, string memberName)
@@ -43,7 +42,7 @@ public class DirectiveParser
         var parts = path.Split('.');
         var typeKey = SplitType(typeName);
 
-        var dummyType = _buildDummyType(typeKey.ns, typeKey.name);
+        var dummyType = _buildDummyType(typeKey);
         IDirective directive = new DTypeCast(dummyType);
 
         for (int i = parts.Length - 1; i >= 0; i--)
@@ -68,14 +67,14 @@ public class DirectiveParser
         return new DTargetChild(memberName, cast);
     }
 
-    static (string ns, string name) SplitType(string typeName)
+    static TypeKey SplitType(string typeName)
     {
         var index = typeName.LastIndexOf('/');
         if (index == -1)
-            return ("/", typeName);
+            return new("/", typeName);
 
         var ns = typeName[..index];
         var type = typeName[(index + 1)..];
-        return (ns, type);
+        return new(ns, type);
     }
 }

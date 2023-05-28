@@ -7,6 +7,7 @@ public class GStructMember
     public uint Offset { get; }
     public uint Size { get; }
     public string? Comment { get; }
+    public List<IDirective>? Directives { get; set; }
 
     public GStructMember(string name, IGhidraType type, uint offset, uint size, string? comment)
     {
@@ -22,9 +23,12 @@ public class GStructMember
 
     public override string ToString() => $"{Offset:X}: {Type.Key.Name} {Name} ({Size:X}){(Comment == null ? "" : " // " + Comment)}";
 
-    public bool Unswizzle(Dictionary<TypeKey, IGhidraType> types)
+    public bool Unswizzle(TypeStore types)
     {
         bool result = false;
+        if (Directives != null)
+            foreach (var directive in Directives)
+                result |= directive.Unswizzle(types);
 
         if (Type is not GDummy dummy)
             return result;

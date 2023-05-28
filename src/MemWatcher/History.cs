@@ -1,4 +1,6 @@
-﻿namespace MemWatcher.Types;
+﻿using GhidraData;
+
+namespace MemWatcher;
 
 public class History
 {

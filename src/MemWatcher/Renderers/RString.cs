@@ -1,9 +1,15 @@
-﻿using ImGuiNET;
+﻿using GhidraData;
+using ImGuiNET;
 
-namespace MemWatcher.Types;
+namespace MemWatcher.Renderers;
 
-public class GString : IGhidraType
+public class RString : IGhidraRenderer
 {
+    const int MaxStringLength = 1024;
+    const uint InitialSize = 32;
+
+    readonly GString _type;
+
     class StringHistory : History
     {
         public uint Size { get; set; }
@@ -11,17 +17,10 @@ public class GString : IGhidraType
         public override string ToString() => $"StringH:{Path}:{Util.Timestamp(LastModifiedTicks):g3}";
     }
 
-    const int MaxStringLength = 1024;
-    const uint InitialSize = 32;
-    GString() { }
-    public static readonly GString Instance = new();
-    public string Namespace => "/";
-    public string Name => "string";
-    public bool IsFixedSize => false;
+    public RString(GString type) => _type = type ?? throw new ArgumentNullException(nameof(type));
+    public override string ToString() => $"R[{_type}]";
     public uint GetSize(History? history) => ((StringHistory?)history)?.Size ?? InitialSize;
-    public History HistoryConstructor(string path, Func<string, string, string?> resolvePath) => new StringHistory(path, this);
-    public string? BuildPath(string accum, string relative) => null;
-
+    public History HistoryConstructor(string path, IHistoryCreationContext context) => new StringHistory(path, _type);
     public bool Draw(History history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
         => Draw((StringHistory)history, address, buffer, previousBuffer);
 
@@ -63,6 +62,4 @@ public class GString : IGhidraType
         ImGui.TextUnformatted("\"" + text + "\"");
         return !previousBuffer.IsEmpty && !buffer.SequenceEqual(previousBuffer);
     }
-
-    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types) { return false; }
 }

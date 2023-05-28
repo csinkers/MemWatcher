@@ -1,18 +1,13 @@
 ﻿using System.Numerics;
 using System.Runtime.InteropServices;
+using GhidraData;
 using ImGuiNET;
 
-namespace MemWatcher.Types;
+namespace MemWatcher.Renderers;
 
-public class GGraphics : IGhidraType
+public class RGraphics : IGhidraRenderer
 {
-    public GGraphics(string width, string height, string stride, string palette)
-    {
-        Width = width;
-        Height = height;
-        Stride = stride;
-        Palette = palette;
-    }
+    readonly GGraphics _type;
 
     class GraphicsHistory : History
     {
@@ -33,25 +28,17 @@ public class GGraphics : IGhidraType
         public string? Palette { get; }
     }
 
-    // Logical relative paths
-    public string Width { get; }
-    public string Height { get; }
-    public string Stride { get; }
-    public string Palette { get; }
-
-    public string Namespace => Constants.SpecialNamespace;
-    public string Name => "gfx";
-    public bool IsFixedSize => false;
-
+    public RGraphics(GGraphics type) => _type = type ?? throw new ArgumentNullException(nameof(type));
+    public override string ToString() => $"R[{_type}]";
     public uint GetSize(History? history) => Constants.PointerSize;
-    public History HistoryConstructor(string path, Func<string, string, string?> resolvePath) =>
+    public History HistoryConstructor(string path, IHistoryCreationContext context) =>
         new GraphicsHistory(
             path,
-            this,
-            resolvePath(Width, path),
-            resolvePath(Height, path),
-            resolvePath(Stride, path),
-            resolvePath(Palette, path));
+            _type,
+            context.ResolvePath(_type.Width, path),
+            context.ResolvePath(_type.Height, path),
+            context.ResolvePath(_type.Stride, path),
+            context.ResolvePath(_type.Palette, path));
 
     public bool Draw(History history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
     {
@@ -104,8 +91,4 @@ public class GGraphics : IGhidraType
 
         return false;
     }
-
-    public string? BuildPath(string accum, string relative) => null;
-    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types) => false;
 }
-

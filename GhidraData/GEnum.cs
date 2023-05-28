@@ -2,9 +2,9 @@
 
 public class GEnum : IGhidraType
 {
-    readonly uint _size;
     public TypeKey Key { get; }
-    public bool IsFixedSize => true;
+    public uint Size { get; }
+    public uint? FixedSize => Size;
     public Dictionary<uint, string> Elements { get; }
     public override string ToString() => Key.Name;
 
@@ -12,8 +12,9 @@ public class GEnum : IGhidraType
     {
         Key = key;
         Elements = elements;
-        _size = size;
+        Size = size;
     }
 
-    public bool Unswizzle(Dictionary<TypeKey, IGhidraType> types) { return false; }
+    public string? BuildPath(string accum, string relative) => null;
+    public bool Unswizzle(TypeStore types) { return false; }
 }

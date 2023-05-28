@@ -12,9 +12,10 @@ public class GFuncPointer : IGhidraType
     public TypeKey Key { get; }
     public IGhidraType ReturnType { get; private set; }
     public List<GFuncParameter> Parameters { get; }
-    public bool IsFixedSize => true;
+    public uint? FixedSize => Constants.PointerSize;
+    public string? BuildPath(string accum, string relative) => null;
 
-    public bool Unswizzle(Dictionary<TypeKey, IGhidraType> types)
+    public bool Unswizzle(TypeStore types)
     {
         bool changed = false;
         if (ReturnType is GDummy dummy)

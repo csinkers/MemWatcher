@@ -1,9 +1,12 @@
-﻿using ImGuiNET;
+﻿using GhidraData;
+using ImGuiNET;
 
-namespace MemWatcher.Types;
+namespace MemWatcher.Renderers;
 
-public class GPointer : IGhidraType
+public class RPointer : IGhidraRenderer
 {
+    readonly GPointer _type;
+
     class PointerHistory : History
     {
         public PointerHistory(string path, IGhidraType type) : base(path, type) { }
@@ -11,22 +14,10 @@ public class GPointer : IGhidraType
         public override string ToString() => $"PtrH:{Path}:{Util.Timestamp(LastModifiedTicks):g3}";
     }
 
-    public GPointer(IGhidraType type) => Type = type ?? throw new ArgumentNullException(nameof(type));
-    public string Namespace => Type.Namespace;
-    public string Name => $"{Type.Name} *";
-    public IGhidraType Type { get; private set; }
-    public bool IsFixedSize => true;
+    public RPointer(GPointer type) => _type = type ?? throw new ArgumentNullException(nameof(type));
+    public override string ToString() => $"R[{_type}]";
     public uint GetSize(History? history) => Constants.PointerSize;
-    public History HistoryConstructor(string path, Func<string, string, string?> resolvePath) => new PointerHistory(path, this);
-
-    public string? BuildPath(string accum, string relative)
-    {
-        accum += '*';
-        return Type.BuildPath(accum, relative);
-    }
-
-    public override string ToString() => Name;
-
+    public History HistoryConstructor(string path, IHistoryCreationContext context) => new PointerHistory(path, _type);
     public bool Draw(History history, uint address, ReadOnlySpan<byte> buffer, ReadOnlySpan<byte> previousBuffer, DrawContext context)
         => Draw((PointerHistory)history, address, buffer, previousBuffer, context);
 
@@ -49,35 +40,27 @@ public class GPointer : IGhidraType
         ImGui.TextColored(color, context.Lookup.Describe(targetAddress)); // TODO: Ensure unformatted
         ImGui.SameLine();
 
-        if (ImGui.TreeNode(Name))
+        if (ImGui.TreeNode(_type.Key.Name))
         {
-            var referentHistory = context.History.GetOrCreateHistory(history.ReferentPath, Type);
+            var referentRenderer = context.Renderers.Get(_type.Type);
+            var referentHistory = context.History.GetOrCreateHistory(history.ReferentPath, referentRenderer);
             if (history.Directives != null)
             {
                 referentHistory.Directives = history.Directives;
                 history.Directives = null;
             }
 
-            var size = Type.GetSize(referentHistory);
+            var size = referentRenderer.GetSize(referentHistory);
             var slice = context.Memory.Read(targetAddress, size);
             var oldSlice = context.Memory.ReadPrevious(targetAddress, size);
 
             ImGui.SetNextItemOpen(true);
-            if (Type.Draw(referentHistory, targetAddress, slice, oldSlice, context))
+            if (referentRenderer.Draw(referentHistory, targetAddress, slice, oldSlice, context))
                 history.LastModifiedTicks = context.Now;
 
             ImGui.TreePop();
         }
 
         return history.LastModifiedTicks == context.Now;
-    }
-
-    public bool Unswizzle(Dictionary<(string ns, string name), IGhidraType> types)
-    {
-        if (Type is not GDummy dummy)
-            return false;
-        
-        Type = types[(dummy.Namespace, dummy.Name)];
-        return true;
     }
 }

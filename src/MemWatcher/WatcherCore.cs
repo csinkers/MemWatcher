@@ -1,4 +1,5 @@
-﻿using ImGuiNET;
+﻿using GhidraData;
+using ImGuiNET;
 
 namespace MemWatcher;
 
@@ -25,12 +26,12 @@ public sealed class WatcherCore : IDisposable
         _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         Config = config ?? throw new ArgumentNullException(nameof(config));
         var memory = new MemoryCache(_reader);
-        var history = new HistoryCache();
+        var renderers = new RendererCache();
+        var history = new HistoryCache(renderers);
 
-        using (var xmlStream = File.OpenRead(xmlFilename))
-            _data = new ProgramData(xmlStream);
+        _data = ProgramData.Load(xmlFilename);
 
-        _drawContext = new DrawContext(memory, history, _data, textures);
+        _drawContext = new DrawContext(memory, history, _data, textures, renderers);
 
         /* foreach (var name in config.Watches)
         {
@@ -51,8 +52,9 @@ public sealed class WatcherCore : IDisposable
 
         _drawContext.Now = DateTime.UtcNow.Ticks;
         _drawContext.Filter = Filter;
-        var history = _drawContext.History.GetOrCreateHistory(Constants.RootNamespaceName, _data.Root);
-        _data.Root.Draw(history, 0, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty, _drawContext);
+        var rootRenderer = _drawContext.Renderers.Get(_data.Root);
+        var history = _drawContext.History.GetOrCreateHistory(Constants.RootNamespaceName, rootRenderer);
+        rootRenderer.Draw(history, 0, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty, _drawContext);
         _drawContext.Refreshed = false;
     }
 

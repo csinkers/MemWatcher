@@ -1,13 +1,15 @@
-﻿using MemWatcher.Types;
+﻿namespace MemWatcher;
 
-namespace MemWatcher;
-
-public class HistoryCache
+public class HistoryCache : IHistoryCreationContext
 {
     static readonly TimeSpan CycleInterval = TimeSpan.FromSeconds(5);
     Dictionary<string, History> _oldHistory = new();
     Dictionary<string, History> _history = new();
     DateTime _lastCycleTime;
+    readonly RendererCache _renderers;
+
+    public HistoryCache(RendererCache renderers) 
+        => _renderers = renderers ?? throw new ArgumentNullException(nameof(renderers));
 
     public History? TryGetHistory(string path)
     {
@@ -21,7 +23,7 @@ public class HistoryCache
         return history;
     }
 
-    string? ResolvePath(string path, string context)
+    string? IHistoryCreationContext.ResolvePath(string path, string context)
     {
         var span = path.AsSpan();
         var resultSpan = context.AsSpan();
@@ -50,15 +52,17 @@ public class HistoryCache
         return ancestor?.Type.BuildPath(ancestorPath, span.ToString());
     }
 
-    public History CreateHistory(string path, IGhidraType type)
+    RendererCache IHistoryCreationContext.Renderers => _renderers;
+
+    public History CreateHistory(string path, IGhidraRenderer renderer)
     {
-        var history = type.HistoryConstructor(path, ResolvePath); // Wasn't used in the current or the previous cache
+        var history = renderer.HistoryConstructor(path, this); // Wasn't used in the current or the previous cache
         _history[path] = history; // Wasn't used in the current cache, so put it in
         return history;
     }
 
-    public History GetOrCreateHistory(string path, IGhidraType type)
-        => TryGetHistory(path) ?? CreateHistory(path, type);
+    public History GetOrCreateHistory(string path, IGhidraRenderer renderer)
+        => TryGetHistory(path) ?? CreateHistory(path, renderer);
 
     public void CycleHistory()
     {

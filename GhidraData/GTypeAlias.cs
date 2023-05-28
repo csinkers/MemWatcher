@@ -4,7 +4,8 @@ public class GTypeAlias : IGhidraType
 {
     public TypeKey Key { get; }
     public IGhidraType Type { get; private set; }
-    public bool IsFixedSize => Type.IsFixedSize;
+    public uint? FixedSize => Type.FixedSize;
+    public string? BuildPath(string accum, string relative) => Type.BuildPath(accum, relative);
     public override string ToString() => $"{Key.Name} = {Type}";
 
     public GTypeAlias(TypeKey key, IGhidraType type)
@@ -13,7 +14,7 @@ public class GTypeAlias : IGhidraType
         Type = type;
     }
 
-    public bool Unswizzle(Dictionary<TypeKey, IGhidraType> types)
+    public bool Unswizzle(TypeStore types)
     {
         if (Type is not GDummy dummy)
             return false;

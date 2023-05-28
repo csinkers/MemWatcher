@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using GhidraData;
 using Xunit;
 
 namespace MemWatcher.Tests;
@@ -132,7 +133,7 @@ public class ProgramDataTests
     public void XmlParseTest()
     {
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(SampleXml));
-        var programData = new ProgramData(stream);
+        var programData = ProgramData.Load(stream);
         Assert.NotNull(programData);
     }
 }

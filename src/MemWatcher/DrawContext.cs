@@ -1,15 +1,19 @@
-﻿namespace MemWatcher;
+﻿using GhidraData;
+
+namespace MemWatcher;
 
 public class DrawContext
 {
-    public DrawContext(MemoryCache memory, HistoryCache history, ProgramData lookup, TextureStore textureStore)
+    public DrawContext(MemoryCache memory, HistoryCache history, ProgramData lookup, TextureStore textureStore, RendererCache renderers)
     {
         Memory = memory ?? throw new ArgumentNullException(nameof(memory));
         History = history ?? throw new ArgumentNullException(nameof(history));
         Lookup = lookup ?? throw new ArgumentNullException(nameof(lookup));
         TextureStore = textureStore ?? throw new ArgumentNullException(nameof(textureStore));
+        Renderers = renderers ?? throw new ArgumentNullException(nameof(renderers));
     }
 
+    public RendererCache Renderers { get; }
     public MemoryCache Memory { get; }
     public HistoryCache History { get; }
     public ProgramData Lookup { get; }

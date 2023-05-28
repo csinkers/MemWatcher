@@ -10,8 +10,12 @@ public static class Program
 {
     public static void Main(string[] args)
     {
-        var left = new ProgramData(args[0], x => x != "_" && !x.Contains(".DLL"));
-        var right = new ProgramData(args[1], x => x != "CheckCookie");
+        var left = ProgramData.Load(args[0], x => x != "_" && !x.Contains(".DLL"));
+        var right = ProgramData.Load(args[1], x => x != "CheckCookie");
+
+        left.PopulateCalls(Path.ChangeExtension(args[0], ".txt"));
+        right.PopulateCalls(Path.ChangeExtension(args[1], ".txt"));
+
         var correlator = new Correlator(left, right, args[2]);
 
         DumpFunctions(left, Path.ChangeExtension(args[0], ".result"));

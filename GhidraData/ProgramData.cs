@@ -9,7 +9,7 @@ public class ProgramData
     readonly (uint Address, string Name)[] _symbols;
     public GFunction[] Functions { get; } // All functions ordered by address
     public Dictionary<TypeKey, GFunction> FunctionLookup { get; } = new();
-    public Dictionary<TypeKey, IGhidraType> Types { get; } = new();
+    public TypeStore Types { get; } = new();
     public GNamespace Root { get; }
 
     public string Describe(uint address)
@@ -29,21 +29,35 @@ public class ProgramData
 
     int FindNearest(uint address) => Util.FindNearest(_symbols, address);
 
-    public ProgramData(string xmlPath, Func<string, bool> functionFilter)
+    public static ProgramData Load(string xmlPath) => Load(xmlPath, _ => true);
+    public static ProgramData Load(Stream xmlStream) => Load(xmlStream, _ => true);
+    public static ProgramData Load(string xmlPath, Func<string, bool> functionFilter)
+    {
+        using var xmlStream = new StreamReader(xmlPath);
+        return new(xmlStream, functionFilter);
+    }
+
+    public static ProgramData Load(Stream xmlStream, Func<string, bool> functionFilter)
+    {
+        using var sr = new StreamReader(xmlStream);
+        return new(sr, functionFilter);
+    }
+
+    ProgramData(StreamReader xmlStream, Func<string, bool> functionFilter)
     {
         var doc = new XmlDocument();
-        using (var xmlStream = new StreamReader(xmlPath))
-            doc.Load(xmlStream);
+        doc.Load(xmlStream);
 
-        Types[GString.Instance.Key] = GString.Instance;
+        Types.Add(GString.Instance);
         foreach (var primitive in GPrimitive.PrimitiveTypes)
-            Types[primitive.Key] = primitive;
+            Types.Add(primitive);
 
         IGhidraType BuildDummyType(TypeKey key)
         {
             key = new(key.Namespace.Trim(), key.Name.Trim());
 
-            if (Types.TryGetValue(key, out var existing))
+            var existing = Types.Get(key);
+            if (existing != null)
                 return existing;
 
             if (key.Name == "char *")
@@ -52,7 +66,7 @@ public class ProgramData
             if (key.Name.EndsWith('*'))
             {
                 var result = new GPointer(BuildDummyType(key with { Name = key.Name[..^1] }));
-                Types[key] = result;
+                Types.Add(key, result);
                 return result;
             }
 
@@ -63,7 +77,7 @@ public class ProgramData
                 var subString = key.Name[(index + 1)..index2];
                 var count = uint.Parse(subString);
                 var result = new GArray(BuildDummyType(key with { Name = key.Name[..index] + key.Name[(index2 + 1)..] }), count);
-                Types[key] = result;
+                Types.Add(key, result);
                 return result;
             }
 
@@ -82,7 +96,7 @@ public class ProgramData
                 elems[UIntAttrib(elem, "VALUE")] = StrAttrib(elem, "NAME") ?? "";
 
             var ge = new GEnum(key, size, elems);
-            Types.Add(key, ge);
+            Types.Add(ge);
         }
 
         foreach (XmlNode typeDef in doc.SelectNodes("/PROGRAM/DATATYPES/TYPE_DEF")!)
@@ -93,11 +107,15 @@ public class ProgramData
 
             var dtns = StrAttrib(typeDef, "DATATYPE_NAMESPACE") ?? "";
             var type = StrAttrib(typeDef, "DATATYPE") ?? "";
-            var td = new GTypeAlias(key, BuildDummyType(new(dtns, type)));
-            if (Types.TryGetValue(key, out var existing) && existing is not GDummy)
-                throw new InvalidOperationException($"The type {ns}/{name} is already defined as {existing}");
+            var alias = new GTypeAlias(key, BuildDummyType(new(dtns, type)));
 
-            Types[key] = td;
+            var existing = Types.Get(key);
+            if (existing != null && existing is not GDummy)
+            {
+                if (existing is not GPrimitive)
+                    throw new InvalidOperationException($"The type {ns}/{name} is already defined as {existing}");
+            }
+            else Types.Add(alias);
         }
 
         foreach (XmlNode funcDef in doc.SelectNodes("/PROGRAM/DATATYPES/FUNCTION_DEF")!)
@@ -127,7 +145,7 @@ public class ProgramData
             }
 
             var td = new GFuncPointer(key, returnType, parameters);
-            Types.Add(key, td);
+            Types.Add(td);
         }
 
         foreach (XmlNode structDef in doc.SelectNodes("/PROGRAM/DATATYPES/STRUCTURE")!)
@@ -153,15 +171,15 @@ public class ProgramData
                 members.Add(new GStructMember(memberName, type, offset, UIntAttrib(member, "SIZE"), commentNode?.InnerText));
             }
 
-            Types.Add(key, new GStruct(key, size, members));
+            Types.Add(new GStruct(key, size, members));
         }
 
         foreach (XmlNode unionDef in doc.SelectNodes("/PROGRAM/DATATYPES/UNION")!)
         {
             var ns = StrAttrib(unionDef, "NAMESPACE") ?? "";
             var name = StrAttrib(unionDef, "NAME") ?? "";
-            var size = UIntAttrib(unionDef, "SIZE");
             var key = new TypeKey(ns, name);
+            var size = UIntAttrib(unionDef, "SIZE");
 
             var members = new List<GStructMember>();
             foreach (var member in unionDef.ChildNodes.OfType<XmlNode>().Where(x => x.Name == "MEMBER"))
@@ -180,7 +198,7 @@ public class ProgramData
             }
 
 
-            Types.Add(key, new GUnion(key, size, members));
+            Types.Add(new GUnion(key, size, members));
         }
 
         var dataBlocks = new Dictionary<uint, GGlobal>();
@@ -229,9 +247,23 @@ public class ProgramData
                 symbols[addr.Value] = name;
         }
 
-        foreach (var key in Types.Keys.ToList())
+        var parser = new DirectiveParser(BuildDummyType);
+        foreach (var key in Types.AllKeys)
         {
-            var type = Types[key];
+            var type = Types.Get(key);
+            if (type is not GStruct structType) continue;
+            foreach (var member in structType.Members)
+            {
+                if (member.Comment == null) continue;
+                member.Directives = parser.TryParse(member.Comment, member.Name).ToList();
+                if (member.Directives.Count == 0)
+                    member.Directives = null;
+            }
+        }
+
+        foreach (var key in Types.AllKeys)
+        {
+            var type = Types.Get(key);
             type.Unswizzle(Types);
         }
 
@@ -309,8 +341,6 @@ public class ProgramData
             fn.IsIgnored = !functionFilter(fn.Key.Name);
             fn.Index = i;
         }
-
-        PopulateCalls(Path.ChangeExtension(xmlPath, ".txt"));
     }
 
     static string? StrAttrib(XmlNode node, string name) => node.Attributes![name]?.Value;
@@ -333,7 +363,7 @@ public class ProgramData
 
     static readonly Regex CallLineRegex = new(@"^([0-9a-f]{8})\s+[0-9a-f]+\s+CALL\s+([^ ]+)\s+$", RegexOptions.Compiled);
     readonly record struct CallInfo(uint Address, string Target);
-    void PopulateCalls(string path)
+    public void PopulateCalls(string path)
     {
         if (!File.Exists(path)) // Load ASCII dump as well if it exists to get call info
             return;
