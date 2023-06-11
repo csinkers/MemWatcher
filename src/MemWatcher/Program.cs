@@ -2,6 +2,7 @@
 using System.Numerics;
 using System.Text;
 using ImGuiNET;
+using MemWatcherPlugin;
 using Veldrid;
 using Veldrid.StartupUtilities;
 
@@ -39,7 +40,7 @@ public static class Program
         };
 
         var config = Config.Load();
-        var reader = MemoryReader.Attach(ProcessName);
+        var reader = WindowsMemoryReader.Attach(ProcessName);
         var textures = new TextureStore(gd, imguiRenderer);
         var core = new WatcherCore(SymbolPath, reader, config, textures);
         var sw = new Stopwatch();
@@ -75,7 +76,7 @@ public static class Program
                 core.Dispose();
                 reader.Dispose();
 
-                reader = MemoryReader.Attach(ProcessName);
+                reader = WindowsMemoryReader.Attach(ProcessName);
                 core = new WatcherCore(SymbolPath, reader, config, textures);
             }
 

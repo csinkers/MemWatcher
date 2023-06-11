@@ -1,8 +1,9 @@
-﻿using Veldrid;
+﻿using DebuggerInterfaces;
+using Veldrid;
 
 namespace MemWatcher;
 
-public class TextureStore
+public class TextureStore : ITextureStore
 {
     const int CyclePeriod = 60;
     readonly object _syncRoot = new();
@@ -57,6 +58,8 @@ public class TextureStore
         }
     }
 
+    (int handle, object texture) ITextureStore.Get(int? handle, uint width, uint height)
+        => Get(handle, width, height);
     public (int handle, Texture texture) Get(int? handle, uint width, uint height)
     {
         var texture = handle.HasValue ? TryGet(handle.Value) : null;
@@ -90,6 +93,9 @@ public class TextureStore
             (_lastCache, _cache) = (_cache, _lastCache);
         }
     }
+
+    void ITextureStore.Update(object texture, uint width, uint height, int stride, ReadOnlySpan<byte> pixelData, ReadOnlySpan<uint> paletteBuf)
+        => Update((Texture)texture, width, height, stride, pixelData, paletteBuf);
 
     public void Update(Texture texture, uint width, uint height, int stride, ReadOnlySpan<byte> pixelData, ReadOnlySpan<uint> paletteBuf)
     {

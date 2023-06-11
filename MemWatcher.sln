@@ -11,9 +11,13 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestProgram", "src\TestProg
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CorrelateSymbols", "src\CorrelateSymbols\CorrelateSymbols.csproj", "{FCB9F1A4-53A2-4274-87FC-319ECA56A7F2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GhidraData", "src\GhidraData\GhidraData.csproj", "{6C656859-91A8-4799-BB8E-9CA267D745CD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GhidraData", "src\GhidraData\GhidraData.csproj", "{6C656859-91A8-4799-BB8E-9CA267D745CD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataCorrelator", "src\DataCorrelator\DataCorrelator.csproj", "{B3E8273C-7465-49EA-9151-EBEF829E5608}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataCorrelator", "src\DataCorrelator\DataCorrelator.csproj", "{B3E8273C-7465-49EA-9151-EBEF829E5608}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DebuggerInterfaces", "DebuggerInterfaces\DebuggerInterfaces.csproj", "{B76D52D7-CFA5-40C2-9B46-795D21868075}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemWatcherPlugin", "MemWatcherPlugin\MemWatcherPlugin.csproj", "{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -97,6 +101,30 @@ Global
 		{B3E8273C-7465-49EA-9151-EBEF829E5608}.Release|x64.Build.0 = Release|Any CPU
 		{B3E8273C-7465-49EA-9151-EBEF829E5608}.Release|x86.ActiveCfg = Release|Any CPU
 		{B3E8273C-7465-49EA-9151-EBEF829E5608}.Release|x86.Build.0 = Release|Any CPU
+		{B76D52D7-CFA5-40C2-9B46-795D21868075}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B76D52D7-CFA5-40C2-9B46-795D21868075}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B76D52D7-CFA5-40C2-9B46-795D21868075}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B76D52D7-CFA5-40C2-9B46-795D21868075}.Debug|x64.Build.0 = Debug|Any CPU
+		{B76D52D7-CFA5-40C2-9B46-795D21868075}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B76D52D7-CFA5-40C2-9B46-795D21868075}.Debug|x86.Build.0 = Debug|Any CPU
+		{B76D52D7-CFA5-40C2-9B46-795D21868075}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B76D52D7-CFA5-40C2-9B46-795D21868075}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B76D52D7-CFA5-40C2-9B46-795D21868075}.Release|x64.ActiveCfg = Release|Any CPU
+		{B76D52D7-CFA5-40C2-9B46-795D21868075}.Release|x64.Build.0 = Release|Any CPU
+		{B76D52D7-CFA5-40C2-9B46-795D21868075}.Release|x86.ActiveCfg = Release|Any CPU
+		{B76D52D7-CFA5-40C2-9B46-795D21868075}.Release|x86.Build.0 = Release|Any CPU
+		{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}.Debug|x64.Build.0 = Debug|Any CPU
+		{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}.Debug|x86.Build.0 = Debug|Any CPU
+		{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}.Release|Any CPU.Build.0 = Release|Any CPU
+		{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}.Release|x64.ActiveCfg = Release|Any CPU
+		{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}.Release|x64.Build.0 = Release|Any CPU
+		{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}.Release|x86.ActiveCfg = Release|Any CPU
+		{332D8762-97FF-4FF8-9CB0-5B769CC0DE49}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
