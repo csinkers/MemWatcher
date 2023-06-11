@@ -52,37 +52,7 @@ public class ProgramData
         foreach (var primitive in GPrimitive.PrimitiveTypes)
             Types.Add(primitive);
 
-        IGhidraType BuildDummyType(TypeKey key)
-        {
-            key = new(key.Namespace.Trim(), key.Name.Trim());
-
-            var existing = Types.Get(key);
-            if (existing != null)
-                return existing;
-
-            if (key.Name == "char *")
-                return new GPointer(BuildDummyType(key with { Name = "string" }));
-
-            if (key.Name.EndsWith('*'))
-            {
-                var result = new GPointer(BuildDummyType(key with { Name = key.Name[..^1] }));
-                Types.Add(key, result);
-                return result;
-            }
-
-            int index = key.Name.IndexOf('[');
-            if (index != -1)
-            {
-                int index2 = key.Name.IndexOf(']');
-                var subString = key.Name[(index + 1)..index2];
-                var count = uint.Parse(subString);
-                var result = new GArray(BuildDummyType(key with { Name = key.Name[..index] + key.Name[(index2 + 1)..] }), count);
-                Types.Add(key, result);
-                return result;
-            }
-
-            return new GDummy(key);
-        }
+        IGhidraType BuildDummyType(TypeKey key) => Types.Get(new(key.Namespace.Trim(), key.Name.Trim()));
 
         foreach (XmlNode enumDef in doc.SelectNodes("/PROGRAM/DATATYPES/ENUM")!)
         {

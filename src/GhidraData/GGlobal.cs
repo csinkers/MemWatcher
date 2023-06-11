@@ -17,7 +17,6 @@ public class GGlobal : IGhidraType
     public override string ToString() => $"{Type} @ {Address:X} ({Size:X})";
     public string? BuildPath(string accum, string relative) => Type.BuildPath(accum, relative);
 
-
     public bool Unswizzle(TypeStore types)
     {
         if (Type is not GDummy dummy) 

@@ -65,11 +65,9 @@ public class RGraphics : IGhidraRenderer
 
         var paletteBuf = context.ReadBytes(h.Palette, 256 * 4);
         var pixelData = context.Memory.Read(rawAddress, width * height);
-        if (paletteBuf.IsEmpty || pixelData.IsEmpty)
-        {
-            ImGui.Text("!! NO IMG !!");
-            return false;
-        }
+
+        if (paletteBuf.IsEmpty) { ImGui.Text("!! NO PAL !!"); return false; }
+        if (pixelData.IsEmpty) { ImGui.Text("!! NO IMG !!"); return false; }
 
         uint sum = 0;
         foreach (var b in paletteBuf) sum = unchecked(sum + b);
