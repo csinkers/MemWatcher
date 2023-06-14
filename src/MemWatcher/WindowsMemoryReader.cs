@@ -1,7 +1,8 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
+using DebuggerInterfaces;
 
-namespace MemWatcherPlugin;
+namespace MemWatcher;
 
 public sealed class WindowsMemoryReader : IMemoryReader
 {

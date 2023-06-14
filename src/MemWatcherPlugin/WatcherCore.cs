@@ -7,11 +7,11 @@ namespace MemWatcherPlugin;
 public sealed class WatcherCore : IDisposable
 {
     readonly IMemoryReader _reader;
-    readonly ProgramData _data;
-    readonly DrawContext _drawContext;
+    readonly ITextureStore _textures;
+    DrawContext? _drawContext;
 
     public string Filter { get; set; } = "";
-    public Config Config { get; }
+    // public Config Config { get; }
     public DateTime LastUpdateTimeUtc { get; private set; } = DateTime.MinValue;
 
     // Active set
@@ -22,17 +22,11 @@ public sealed class WatcherCore : IDisposable
     // Highlight changed values
     // Searching / filtering.
 
-    public WatcherCore(string xmlFilename, IMemoryReader reader, Config config, ITextureStore textures)
+    public WatcherCore(IMemoryReader reader, ITextureStore textures)
     {
         _reader = reader ?? throw new ArgumentNullException(nameof(reader));
-        Config = config ?? throw new ArgumentNullException(nameof(config));
-        var memory = new MemoryCache(_reader);
-        var renderers = new RendererCache();
-        var history = new HistoryCache(renderers);
-
-        _data = ProgramData.Load(xmlFilename);
-
-        _drawContext = new DrawContext(memory, history, _data, textures, renderers);
+        _textures = textures ?? throw new ArgumentNullException(nameof(textures));
+        // Config = Config.Load();
 
         /* foreach (var name in config.Watches)
         {
@@ -46,33 +40,34 @@ public sealed class WatcherCore : IDisposable
         }*/
     }
 
+    const string SymbolPath = @"C:\Depot\bb\ualbion_extra\SR-Main.exe.xml";
     public void Draw()
     {
-        if (ImGui.Button("Save Config"))
-            SaveConfig();
+        if (ImGui.Button("Reload from XML"))
+            _drawContext = new DrawContext(SymbolPath, _reader, _textures);
+
+        if (_drawContext == null)
+            return;
 
         _drawContext.Now = DateTime.UtcNow.Ticks;
         _drawContext.Filter = Filter;
-        var rootRenderer = _drawContext.Renderers.Get(_data.Root);
+
+        var rootRenderer = _drawContext.Renderers.Get(_drawContext.Data.Root);
         var history = _drawContext.History.GetOrCreateHistory(Constants.RootNamespaceName, rootRenderer);
+
         rootRenderer.Draw(history, 0, ReadOnlySpan<byte>.Empty, ReadOnlySpan<byte>.Empty, _drawContext);
         _drawContext.Refreshed = false;
     }
 
-    void SaveConfig()
-    {
-        // Config.Watches.Clear();
-        // foreach (var ns in _data.Namespaces)
-        //    foreach (var watch in ns.Watches/*.Where(watch => watch.IsActive)*/)
-        //        Config.Watches.Add(ns.Name + "/" + watch.Name);
-        Config.Save();
-    }
-
     public void Update()
     {
-        _drawContext.History.CycleHistory();
-        _drawContext.Memory.Refresh();
-        _drawContext.Refreshed = true;
+        if (_drawContext != null)
+        {
+            _drawContext.History.CycleHistory();
+            _drawContext.Memory.Refresh();
+            _drawContext.Refreshed = true;
+        }
+
         LastUpdateTimeUtc = DateTime.UtcNow;
     }
 

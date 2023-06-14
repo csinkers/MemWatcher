@@ -32,7 +32,7 @@ public static class Util
         return new Vector4(1.0f, t, t, 1.0f);
     }
 
-    public static int FindNearest<T>(IList<(uint Address, T)> collection, uint address) // Binary search
+    public static int FindNearest<T>(IList<T> collection, Func<T, uint> addressAccessor, uint address) // Binary search
     {
         int first = 0;
         int last = collection.Count - 1;
@@ -41,16 +41,16 @@ public static class Util
         do
         {
             mid = first + (last - first) / 2;
-            if (address > collection[mid].Address)
+            if (address > addressAccessor(collection[mid]))
                 first = mid + 1;
             else
                 last = mid - 1;
 
-            if (collection[mid].Address == address)
+            if (addressAccessor(collection[mid]) == address)
                 return mid;
         } while (first <= last);
 
-        if (collection[mid].Address > address && mid != 0)
+        if (addressAccessor(collection[mid]) > address && mid != 0)
             mid--;
 
         return mid;

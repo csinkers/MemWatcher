@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DebuggerInterfaces\DebuggerInterfaces.csproj" />
-    <ProjectReference Include="..\src\GhidraData\GhidraData.csproj" />
+    <ProjectReference Include="..\GhidraData\GhidraData.csproj" />
   </ItemGroup>
 
 </Project>

@@ -37,7 +37,7 @@ public class RPointer : IGhidraRenderer
 
         var color = Util.ColorForAge(context.Now - history.LastModifiedTicks);
         var targetAddress = BitConverter.ToUInt32(buffer);
-        ImGui.TextColored(color, context.Lookup.Describe(targetAddress)); // TODO: Ensure unformatted
+        ImGui.TextColored(color, context.DescribeAddress(targetAddress)); // TODO: Ensure unformatted
         ImGui.SameLine();
 
         if (ImGui.TreeNode(_type.Key.Name))

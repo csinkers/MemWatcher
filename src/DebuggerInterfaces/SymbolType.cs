@@ -2,6 +2,7 @@
 
 public enum SymbolType
 {
+    Unknown,
     Function,
     Global,
     Local

@@ -17,9 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\DebuggerInterfaces\DebuggerInterfaces.csproj" />
-    <ProjectReference Include="..\..\MemWatcherPlugin\MemWatcherPlugin.csproj" />
+    <ProjectReference Include="..\DebuggerInterfaces\DebuggerInterfaces.csproj" />
+    <!-- <ProjectReference Include="..\MemWatcherPlugin\MemWatcherPlugin.csproj" /> -->
     <ProjectReference Include="..\GhidraData\GhidraData.csproj" />
+    <ProjectReference Include="..\MemWatcherPlugin\MemWatcherPlugin.csproj" />
   </ItemGroup>
 
 </Project>

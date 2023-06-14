@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Xml;
 
@@ -6,28 +7,21 @@ namespace GhidraData;
 
 public class ProgramData
 {
-    readonly (uint Address, string Name)[] _symbols;
+    readonly Symbol[] _symbols;
     public GFunction[] Functions { get; } // All functions ordered by address
     public Dictionary<TypeKey, GFunction> FunctionLookup { get; } = new();
     public TypeStore Types { get; } = new();
     public GNamespace Root { get; }
 
-    public string Describe(uint address)
+    public (uint address, string name, object? context) Lookup(uint address)
     {
         if (address == 0)
-            return "(null)";
+            return (0, "(null)", null);
 
-        var index = FindNearest(address);
+        var index = Util.FindNearest(_symbols, x => x.Address, address);
         var symbol = _symbols[index];
-        var delta = (int)(address - symbol.Address);
-        var sign = delta < 0 ? '-' : '+';
-        var absDelta = Math.Abs(delta);
-        return delta > 0 
-            ? $"{symbol.Name}{sign}0x{absDelta:X} ({address:X})" 
-            : symbol.Name;
+        return (symbol.Address, symbol.Name, symbol.Context);
     }
-
-    int FindNearest(uint address) => Util.FindNearest(_symbols, address);
 
     public static ProgramData Load(string xmlPath) => Load(xmlPath, _ => true);
     public static ProgramData Load(Stream xmlStream) => Load(xmlStream, _ => true);
@@ -171,30 +165,7 @@ public class ProgramData
             Types.Add(new GUnion(key, size, members));
         }
 
-        var dataBlocks = new Dictionary<uint, GGlobal>();
-        foreach (XmlNode definedData in doc.SelectNodes("/PROGRAM/DATA/DEFINED_DATA")!)
-        {
-            var dns = StrAttrib(definedData, "DATATYPE_NAMESPACE") ?? "";
-            var dname = StrAttrib(definedData, "DATATYPE") ?? "";
-            uint? addr = HexAttrib(definedData, "ADDRESS");
-            if (addr == null)
-                continue;
-
-            var size = UIntAttrib(definedData, "SIZE");
-            dataBlocks[addr.Value] = new GGlobal(addr.Value, size, BuildDummyType(new(dns, dname)));
-        }
-
-        var symbols = new Dictionary<uint, string>();
-
-        foreach (XmlNode fun in doc.SelectNodes("/PROGRAM/FUNCTIONS/FUNCTION")!)
-        {
-            var addr = HexAttrib(fun, "ENTRY_POINT");
-            if (addr == null)
-                continue;
-
-            var name = StrAttrib(fun, "NAME") ?? "";
-            symbols[addr.Value] = name;
-        }
+        var symbols = new Dictionary<uint, Symbol>();
 
         Dictionary<TypeKey, GGlobal> globalVariables = new();
         foreach (XmlNode sym in doc.SelectNodes("/PROGRAM/SYMBOL_TABLE/SYMBOL")!)
@@ -205,16 +176,27 @@ public class ProgramData
 
             var name = StrAttrib(sym, "NAME") ?? "";
             var ns = StrAttrib(sym, "NAMESPACE") ?? "";
-            var key = new TypeKey(ns, name);
-
-            if (dataBlocks.TryGetValue(addr.Value, out var data))
-            {
-                data.Key = key;
-                globalVariables[key] = data;
-            }
 
             if (!name.StartsWith("case"))
-                symbols[addr.Value] = name;
+                symbols[addr.Value] = new Symbol(addr.Value, ns, name);
+        }
+
+        foreach (XmlNode definedData in doc.SelectNodes("/PROGRAM/DATA/DEFINED_DATA")!)
+        {
+            var dns = StrAttrib(definedData, "DATATYPE_NAMESPACE") ?? "";
+            var dname = StrAttrib(definedData, "DATATYPE") ?? "";
+            uint? addr = HexAttrib(definedData, "ADDRESS");
+            if (addr == null)
+                continue;
+
+            var size = UIntAttrib(definedData, "SIZE");
+            var dataBlock = new GGlobal(addr.Value, size, BuildDummyType(new(dns, dname)));
+            if (symbols.TryGetValue(addr.Value, out var symbol))
+            {
+                dataBlock.Key = symbol.Key;
+                symbol.Context = dataBlock;
+                globalVariables[dataBlock.Key] = dataBlock;
+            }
         }
 
         var parser = new DirectiveParser(BuildDummyType);
@@ -240,7 +222,6 @@ public class ProgramData
         foreach (var kvp in globalVariables)
             kvp.Value.Unswizzle(Types);
 
-        _symbols = symbols.Select(x => (x.Key, x.Value)).OrderBy(x => x.Key).ToArray();
         var namespaces = new Dictionary<string, GNamespace>();
         Root = new GNamespace(Constants.RootNamespaceName);
         namespaces[""] = Root;
@@ -269,6 +250,7 @@ public class ProgramData
 
         // Functions
         var regions = new List<(uint Start, uint End)>();
+
         foreach (XmlNode fn in doc.SelectNodes("/PROGRAM/FUNCTIONS/FUNCTION")!)
         {
             var addr = HexAttrib(fn, "ENTRY_POINT");
@@ -302,6 +284,8 @@ public class ProgramData
                 entry.Regions.Add(region);
 
             FunctionLookup.Add(key, entry);
+            if (symbols.TryGetValue(addr.Value, out var symbol))
+                symbol.Context = entry;
         }
 
         Functions = FunctionLookup.Values.OrderBy(x => x.Address).ToArray();
@@ -311,6 +295,8 @@ public class ProgramData
             fn.IsIgnored = !functionFilter(fn.Key.Name);
             fn.Index = i;
         }
+
+        _symbols = symbols.Values.OrderBy(x => x.Address).ToArray();
     }
 
     static string? StrAttrib(XmlNode node, string name) => node.Attributes![name]?.Value;

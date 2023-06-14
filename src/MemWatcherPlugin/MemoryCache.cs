@@ -1,4 +1,6 @@
-﻿namespace MemWatcherPlugin;
+﻿using DebuggerInterfaces;
+
+namespace MemWatcherPlugin;
 
 public class MemoryCache
 {

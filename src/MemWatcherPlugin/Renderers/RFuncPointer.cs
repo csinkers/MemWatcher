@@ -26,7 +26,7 @@ public class RFuncPointer : IGhidraRenderer
 
         var color = Util.ColorForAge(context.Now - history.LastModifiedTicks);
         var targetAddress = MemoryMarshal.Read<uint>(buffer);
-        ImGui.TextColored(color, context.Lookup.Describe(targetAddress)); // TODO: Ensure unformatted
+        ImGui.TextColored(color, context.DescribeAddress(targetAddress)); // TODO: Ensure unformatted
 
         return history.LastModifiedTicks == context.Now;
     }

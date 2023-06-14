@@ -1,7 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using System.Security;
 
-namespace MemWatcherPlugin;
+namespace MemWatcher;
 
 internal static class NativeImports
 {

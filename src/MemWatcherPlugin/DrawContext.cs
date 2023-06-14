@@ -5,19 +5,19 @@ namespace MemWatcherPlugin;
 
 public class DrawContext
 {
-    public DrawContext(MemoryCache memory, HistoryCache history, ProgramData lookup, ITextureStore textureStore, RendererCache renderers)
+    public DrawContext(string ghidraXmlPath, IMemoryReader reader, ITextureStore textureStore)
     {
-        Memory = memory ?? throw new ArgumentNullException(nameof(memory));
-        History = history ?? throw new ArgumentNullException(nameof(history));
-        Lookup = lookup ?? throw new ArgumentNullException(nameof(lookup));
+        Renderers = new RendererCache();
+        History = new HistoryCache(Renderers);
+        Memory = new MemoryCache(reader);
+        Data = ProgramData.Load(ghidraXmlPath);
         TextureStore = textureStore ?? throw new ArgumentNullException(nameof(textureStore));
-        Renderers = renderers ?? throw new ArgumentNullException(nameof(renderers));
     }
 
+    public ProgramData Data { get; }
     public RendererCache Renderers { get; }
     public MemoryCache Memory { get; }
     public HistoryCache History { get; }
-    public ProgramData Lookup { get; }
     public ITextureStore TextureStore { get; }
     public long Now { get; set; }
     public bool Refreshed { get; set; }
@@ -43,5 +43,19 @@ public class DrawContext
 
         var history = History.TryGetHistory(path);
         return history == null ? ReadOnlySpan<byte>.Empty : Memory.Read(history.LastAddress, size);
+    }
+
+    public string DescribeAddress(uint address)
+    {
+        var (symAddress, name, _) = Data.Lookup(address);
+        if (address == 0)
+            return "(null)";
+
+        var delta = (int)(address - symAddress);
+        var sign = delta < 0 ? '-' : '+';
+        var absDelta = Math.Abs(delta);
+        return delta > 0 
+            ? $"{name}{sign}0x{absDelta:X} ({address:X})" 
+            : name;
     }
 }

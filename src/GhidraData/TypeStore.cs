@@ -27,7 +27,7 @@ public class TypeStore
 
         if (key.Name.EndsWith('*'))
         {
-            var result = new GPointer(Get(key with { Name = key.Name[..^1] }));
+            var result = new GPointer(Get(key with { Name = key.Name[..^1].Trim() }));
             Add(key, result);
             return result;
         }

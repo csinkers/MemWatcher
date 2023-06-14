@@ -1,4 +1,4 @@
-﻿namespace MemWatcherPlugin;
+﻿namespace DebuggerInterfaces;
 
 public interface IMemoryReader : IDisposable
 {

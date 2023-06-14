@@ -10,7 +10,6 @@ namespace MemWatcher;
 
 public static class Program
 {
-    const string SymbolPath = @"C:\Depot\bb\ualbion_extra\SR-Main.exe.xml";
     const string ProcessName = @"SR-Main";
     public static void Main()
     {
@@ -39,10 +38,9 @@ public static class Program
             imguiRenderer.WindowResized(window.Width, window.Height);
         };
 
-        var config = Config.Load();
-        var reader = WindowsMemoryReader.Attach(ProcessName);
         var textures = new TextureStore(gd, imguiRenderer);
-        var core = new WatcherCore(SymbolPath, reader, config, textures);
+        var reader = WindowsMemoryReader.Attach(ProcessName);
+        var core = new WatcherCore(reader, textures);
         var sw = new Stopwatch();
         int interval = 100;
         // bool onlyShowActive = false;
@@ -70,15 +68,6 @@ public static class Program
             ImGui.SetNextWindowPos(new Vector2(0, 0));
             ImGui.SetNextWindowSize(new Vector2(window.Width, window.Height));
             ImGui.Begin("Watcher");
-
-            if (ImGui.Button("Reload from XML"))
-            {
-                core.Dispose();
-                reader.Dispose();
-
-                reader = WindowsMemoryReader.Attach(ProcessName);
-                core = new WatcherCore(SymbolPath, reader, config, textures);
-            }
 
 #if RENDERDOC
             ImGui.SameLine();
